@@ -210,11 +210,12 @@ def smooth_scans(scans,
     smoothed_scans = [0] * len(scans)
 
     if smoothing_parm is 'ask':
-        _ = QtGui.QApplication(sys.argv)
+        # app = QtGui.QApplication(sys.argv)
         input_d = QtGui.QInputDialog(None,
                                      QtCore.Qt.WindowStaysOnTopHint)
         input_d.activateWindow()
         input_d.raise_()
+        # app.exec_()
 
         smoothing_parm, ok = input_d.getDouble(None,
                                                'Input Dialog',
@@ -228,6 +229,7 @@ def smooth_scans(scans,
         else:
             print 'User cancelled input. Terminating.'
             sys.exit(1)
+        # input_d.exit()
 
     if show_progressbar:
         widgets = [progress_label, Percentage(), ' ', Bar(), ' ', ETA()]
@@ -425,10 +427,10 @@ def get_scans_and_eels_fnames():
     c_to_o_stem, c_to_o_eels, o_to_c_stem, o_to_c_eels: list
         lists of file names for each selected files
     """
-    c_to_o_stem = gui_fnames(title="Select C to O STEM scans...")
-    c_to_o_eels = gui_fnames(title="Select C to O EELS lines...")
-    o_to_c_stem = gui_fnames(title="Select O to C STEM scans...")
-    o_to_c_eels = gui_fnames(title="Select O to C EELS lines...")
+    c_to_o_stem = gui_fnames(title="Select SiC to SiO2 STEM scans...")
+    c_to_o_eels = gui_fnames(title="Select SiC to SiO2 EELS lines...")
+    o_to_c_stem = gui_fnames(title="Select SiO2 to SiC STEM scans...")
+    o_to_c_eels = gui_fnames(title="Select SiO2 to SiC EELS lines...")
 
     return c_to_o_stem, c_to_o_eels, o_to_c_stem, o_to_c_eels
 
@@ -443,6 +445,18 @@ def load_shift_and_build_area(c_to_o_stem=None,
     """
     Load a number of STEM signals and EELS line scans in order to
     build useful area scans out of them for decomposition and other analysis
+
+    Usage:
+    ------
+    If no filenames are supplied, four file chooser dialogs will be opened.
+    The files should be chosen in the order of SiC to SiO2 STEM, SiC to SiO2
+    EELS, SiO2 to SiC STEM, and then SiO2 to SiC EELS.
+    If there are not reversed line scans to analyze (i.e. the scans were
+    acquired just in one direction), then select them in the appropriate
+    window, and press 'Cancel' on the file selection for the ones that are
+    not relevant.
+
+    Note: all line scans must be same dimensions, or there will be an error.
 
     Parameters:
     -----------
@@ -546,11 +560,30 @@ def load_shift_and_build_area(c_to_o_stem=None,
 
     # create area spectrum images from the lines
     area_eels_nocrop = hs.utils.stack(shifted_lines)
+    area_eels_nocrop.axes_manager[1].name = 'line scan'
+    area_eels_nocrop.axes_manager[1].units = '#'
     area_stem_nocrop = hs.utils.stack(shifted_scans)
+    area_stem_nocrop.axes_manager[0].name = 'STEM profile'
+    area_stem_nocrop.axes_manager[0].units = '#'
+
+    # Set appropriate titles for the signals
+    area_eels_nocrop.metadata.General.title = 'Stacked EELS line scans - ' \
+                                              'shifted'
+    area_stem_nocrop.metadata.General.title = 'Stacked STEM signals - shifted'
 
     # crop the area spectrum images so there is no blank data
     area_eels = crop_area_scan(area_eels_nocrop, shifts)
+    area_eels.axes_manager[1].name = 'line scan'
+    area_eels.axes_manager[1].units = '#'
     area_stem = crop_area_scan(area_stem_nocrop, shifts)
+    area_stem.axes_manager[0].name = 'STEM profile'
+    area_stem.axes_manager[0].units = '#'
+
+    # Set appropriate titles for the signals
+    area_eels.metadata.General.title = 'Stacked EELS line scans - shifted ' \
+                                       'and cropped'
+    area_stem.metadata.General.title = 'Stacked STEM signals - shifted and ' \
+                                       'cropped'
 
     # initialize the results list with the cropped and shifted data
     res = [area_stem, area_eels]
@@ -564,6 +597,15 @@ def load_shift_and_build_area(c_to_o_stem=None,
     if return_unshifted:
         area_stem_unshifted = hs.utils.stack(scans)
         area_eels_unshifted = hs.utils.stack(lines)
+
+        # Set appropriate titles for the signals
+        area_eels_unshifted.metadata.General.title = 'Stacked EELS line scans'
+        area_eels_unshifted.axes_manager[1].name = 'line scan'
+        area_eels_unshifted.axes_manager[1].units = '#'
+        area_stem_unshifted.metadata.General.title = 'Stacked STEM signals'
+        area_stem_unshifted.axes_manager[0].name = 'STEM profile'
+        area_stem_unshifted.axes_manager[0].units = '#'
+
         res.append(area_stem_unshifted)
         res.append(area_eels_unshifted)
 
