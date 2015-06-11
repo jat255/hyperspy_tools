@@ -22,10 +22,31 @@
 
 import numpy as np
 import sys
+import re
 
 from hyperspy import hspy as hs
 from PyQt4 import QtGui, QtCore
 from progressbar import ProgressBar, Percentage, Bar, ETA
+
+
+def _natural_sort(l):
+    """
+    Internal function to sort a list naturally (10 comes after 9)
+    (from: http://stackoverflow.com/questions/4836710/does-python-have-a-
+    built-in-function-for-string-natural-sort)
+
+    Parameters:
+    -----------
+    l: list
+        list of values to sort naturally
+
+    Returns:
+    --------
+    sorted list
+    """
+    convert = lambda text: int(text) if text.isdigit() else text.lower()
+    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
+    return sorted(l, key=alphanum_key)
 
 
 # noinspection PyTypeCheckerInspection
@@ -420,7 +441,8 @@ def get_scans_and_eels_fnames():
     """
     Get the list of file names for all the line scans selected. This
     function will pop up four dialogs asking for STEM and EELS files for SiC
-    to SiO2 direction and SiO2 to SiC direction.
+    to SiO2 direction and SiO2 to SiC direction. The method also sorts the
+    lists in natural order so they are in an order that makes sense.
 
     Returns:
     --------
@@ -431,6 +453,12 @@ def get_scans_and_eels_fnames():
     c_to_o_eels = gui_fnames(title="Select SiC to SiO2 EELS lines...")
     o_to_c_stem = gui_fnames(title="Select SiO2 to SiC STEM scans...")
     o_to_c_eels = gui_fnames(title="Select SiO2 to SiC EELS lines...")
+
+    # Sort lists to make sure they are in the right order:
+    c_to_o_stem = _natural_sort(c_to_o_stem)
+    c_to_o_eels = _natural_sort(c_to_o_eels)
+    o_to_c_stem = _natural_sort(o_to_c_stem)
+    o_to_c_eels = _natural_sort(o_to_c_eels)
 
     return c_to_o_stem, c_to_o_eels, o_to_c_stem, o_to_c_eels
 
@@ -509,6 +537,9 @@ def load_shift_and_build_area(c_to_o_stem=None,
                 Hyperspy signal containing the unshifted EELS line scans
                 as an area scan, rather than a list of single line scans
     """
+    def _check_list_equal(iterator):
+        # will return whether all items in list are the same or not
+        return len(set(iterator)) <= 1
 
     # if no EELS scans are provided, get the information from dialog:
     if c_to_o_eels is None and o_to_c_eels is None:
@@ -533,6 +564,39 @@ def load_shift_and_build_area(c_to_o_stem=None,
     # combine lists to make bigger lists:
     scans = c_to_o_scans + o_to_c_scans
     lines = c_to_o_lines + o_to_c_lines
+
+    scan_sizes = [i.axes_manager.shape for i in scans]
+    line_sizes = [i.axes_manager.shape for i in lines]
+
+    if not _check_list_equal(scans):
+        print "STEM scans were not all same size."
+        print ""
+        print "SiC to SiO2 files were:"
+        for i in c_to_o_stem:
+            print i
+        print ""
+        print "SiO2 to SiC files were:"
+        for i in o_to_c_stem:
+            print i
+
+        print ""
+        print "Sizes were:", scan_sizes
+        raise ValueError("All line scans must be same size for stacking.")
+
+    if not _check_list_equal(lines):
+        print "EELS line scans were not all same size."
+        print ""
+        print "SiC to SiO2 files were:"
+        for i in c_to_o_eels:
+            print i
+        print ""
+        print "SiO2 to SiC files were:"
+        for i in o_to_c_eels:
+            print i
+
+        print ""
+        print "Sizes were:", line_sizes
+        raise ValueError("All line scans must be same size for stacking.")
 
     # smooth scans:
     smoothed_scans = smooth_scans(scans,
