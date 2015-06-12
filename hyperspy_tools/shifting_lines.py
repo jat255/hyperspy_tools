@@ -568,7 +568,7 @@ def load_shift_and_build_area(c_to_o_stem=None,
     scan_sizes = [i.axes_manager.shape for i in scans]
     line_sizes = [i.axes_manager.shape for i in lines]
 
-    if not _check_list_equal(scans):
+    if not _check_list_equal(scan_sizes):
         print "STEM scans were not all same size."
         print ""
         print "SiC to SiO2 files were:"
@@ -583,7 +583,7 @@ def load_shift_and_build_area(c_to_o_stem=None,
         print "Sizes were:", scan_sizes
         raise ValueError("All line scans must be same size for stacking.")
 
-    if not _check_list_equal(lines):
+    if not _check_list_equal(line_sizes):
         print "EELS line scans were not all same size."
         print ""
         print "SiC to SiO2 files were:"
