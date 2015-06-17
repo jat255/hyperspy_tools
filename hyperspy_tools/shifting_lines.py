@@ -519,6 +519,8 @@ def load_shift_and_build_area(c_to_o_stem=None,
                 Hyperspy signal containing the shifted and cropped EELS
                 line scans as an area scan, rather than a list of single
                 line scans
+            file_list: list
+                List of the files that were processed
             area_stem_nocrop: hs.signal
                 (Optional)
                 Hyperspy signal containing shifted but not cropped STEM
@@ -548,6 +550,9 @@ def load_shift_and_build_area(c_to_o_stem=None,
          c_to_o_eels,
          o_to_c_stem,
          o_to_c_eels) = get_scans_and_eels_fnames()
+
+    # Save filenames in a list for reporting
+    file_list = c_to_o_stem + c_to_o_eels + o_to_c_stem + o_to_c_eels
 
     # load in the files from the list of files:
     c_to_o_scans = [hs.load(x) for x in c_to_o_stem]
@@ -649,8 +654,9 @@ def load_shift_and_build_area(c_to_o_stem=None,
     area_stem.metadata.General.title = 'Stacked STEM signals - shifted and ' \
                                        'cropped'
 
-    # initialize the results list with the cropped and shifted data
-    res = [area_stem, area_eels]
+    # initialize the results list with the cropped and shifted data and the
+    # list of file names that were analyzed
+    res = [area_stem, area_eels, file_list]
 
     # if we want to return the uncropped data, add it to the list
     if return_uncropped:
