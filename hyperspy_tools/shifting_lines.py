@@ -72,11 +72,15 @@ def gui_fnames(title=None, directory=None):
         title = 'Select data file(s)...'
     if directory is None:
         directory = './'
+    if QtGui.QApplication.instance() is None:
+        app = QtGui.QApplication(sys.argv)
     fname = QtGui.QFileDialog.getOpenFileNames(None,
                                                title,
                                                directory,
                                                filter='All files (*)')
-    return fname
+    # app.exit()
+
+    return [str(name) for name in fname]
 
 
 def shift_line_scan(s, shift, **kwargs):
@@ -231,7 +235,9 @@ def smooth_scans(scans,
     smoothed_scans = [0] * len(scans)
 
     if smoothing_parm is 'ask':
-        # app = QtGui.QApplication(sys.argv)
+        if QtGui.QApplication.instance() is None:
+            app = QtGui.QApplication(sys.argv)
+
         input_d = QtGui.QInputDialog(None,
                                      QtCore.Qt.WindowStaysOnTopHint)
         input_d.activateWindow()
@@ -246,6 +252,7 @@ def smooth_scans(scans,
                                                decimals=2,
                                                value=0.05)
         if ok:
+            # app.exit()
             pass
         else:
             print 'User cancelled input. Terminating.'
