@@ -23,6 +23,7 @@
 import numpy as np
 import sys
 import re
+from pprint import pprint
 
 from hyperspy import hspy as hs
 from PyQt4 import QtGui, QtCore
@@ -274,7 +275,8 @@ def smooth_scans(scans,
 def determine_shifts(scans,
                      flip_scans=None,
                      do_smoothing=True,
-                     smoothing_parameter=0.05):
+                     smoothing_parameter=0.05,
+                     debug=False):
     """
     determine the units needed to shift scans to the center of spectrum image
 
@@ -299,6 +301,9 @@ def determine_shifts(scans,
         derivative. The default of 0.05 seems to work well for typical STEM
         scans.
         If 'ask', a dialog box will be risen asking for the factor
+    debug: boolean
+        switch whether debugging information is printed out to see the shift
+        values and everything
 
     Returns
     -------
@@ -316,9 +321,12 @@ def determine_shifts(scans,
         last = scans[0].data[len(scans[0].data) - 6:
                              len(scans[0].data) - 1].mean()
         if first > last:
-            # print "Flipping scans"
+            if debug:
+                print "Flipping scans"
             flip_scans = True
         else:
+            if debug:
+                print "Not flipping scans"
             flip_scans = False
 
     # smooth the scans:
@@ -334,7 +342,8 @@ def determine_shifts(scans,
             # if needed, flip the data so the profile is increasing
             stem.data = stem.data[::-1]
 
-        midpoint = smoothed_scans[i].axes_manager[0].index2value(stem.diff(0)
+        deriv = stem.diff(0)
+        midpoint = smoothed_scans[i].axes_manager[0].index2value(deriv
                                                                  .indexmax(0)
                                                                  .data)
         mids[i] = midpoint
@@ -342,12 +351,21 @@ def determine_shifts(scans,
 
     shifts = mids - np.mean(mids)
 
+    if debug:
+        print "Mids are:"
+        pprint(list(mids))
+        print "Mean mids is %g" % np.mean(mids)
+
     # we need the negative of shifts for actual shifting. If we had to
     # flip the scans, this is already taken care of, but if not
     # then we should return the negative amount
     if flip_scans:
+        if debug:
+            print "RETURNING SHIFTS"
         return shifts
     else:
+        if debug:
+            print "RETURNING SHIFTS*-1"
         return shifts * -1
 
 
@@ -476,7 +494,8 @@ def load_shift_and_build_area(c_to_o_stem=None,
                               o_to_c_eels=None,
                               smoothing_parm=0.05,
                               return_unshifted=False,
-                              return_uncropped=False):
+                              return_uncropped=False,
+                              debug=False):
     """
     Load a number of STEM signals and EELS line scans in order to
     build useful area scans out of them for decomposition and other analysis
@@ -513,6 +532,9 @@ def load_shift_and_build_area(c_to_o_stem=None,
     return_uncropped: boolean
         switch whether or not to return the uncropped data (good for
         comparison)
+    debug: boolean
+        switch whether debugging information is printed out to see the shift
+        values and everything
 
     Returns:
     --------
@@ -578,8 +600,11 @@ def load_shift_and_build_area(c_to_o_stem=None,
     lines = c_to_o_lines + o_to_c_lines
 
     scan_sizes = [i.axes_manager.shape for i in scans]
+    scan_scales = [i.axes_manager[0].scale for i in scans]
     line_sizes = [i.axes_manager.shape for i in lines]
+    line_scales = [i.axes_manager[0].scale for i in lines]
 
+    # Handle some errors related to scan sizes and magnifications
     if not _check_list_equal(scan_sizes):
         print "STEM scans were not all same size."
         print ""
@@ -592,8 +617,25 @@ def load_shift_and_build_area(c_to_o_stem=None,
             print i
 
         print ""
-        print "Sizes were:", scan_sizes
+        print "Sizes were:"
+        pprint(scan_sizes)
         raise ValueError("All line scans must be same size for stacking.")
+
+    if not _check_list_equal(scan_scales):
+        print "STEM scans were not all same scale (different mag?)."
+        print ""
+        print "SiC to SiO2 files were:"
+        for i in c_to_o_stem:
+            print i
+        print ""
+        print "SiO2 to SiC files were:"
+        for i in o_to_c_stem:
+            print i
+
+        print ""
+        print "Scales were:"
+        pprint(scan_scales)
+        raise ValueError("All line scans must be same scale for stacking.")
 
     if not _check_list_equal(line_sizes):
         print "EELS line scans were not all same size."
@@ -607,8 +649,25 @@ def load_shift_and_build_area(c_to_o_stem=None,
             print i
 
         print ""
-        print "Sizes were:", line_sizes
+        print "Sizes were:"
+        pprint(line_sizes)
         raise ValueError("All line scans must be same size for stacking.")
+
+    if not _check_list_equal(line_scales):
+        print "EELS line scans were not all same scale (different mag?)."
+        print ""
+        print "SiC to SiO2 files were:"
+        for i in c_to_o_stem:
+            print i
+        print ""
+        print "SiO2 to SiC files were:"
+        for i in o_to_c_stem:
+            print i
+
+        print ""
+        print "Scales were:"
+        pprint(line_scales)
+        raise ValueError("All line scans must be same scale for stacking.")
 
     # smooth scans:
     smoothed_scans = smooth_scans(scans,
@@ -616,7 +675,13 @@ def load_shift_and_build_area(c_to_o_stem=None,
                                   smoothing_parm=smoothing_parm)
 
     # do actual shifting and cropping:
-    shifts = determine_shifts(smoothed_scans, do_smoothing=False)
+    shifts = determine_shifts(smoothed_scans,
+                              do_smoothing=False,
+                              debug=debug)
+
+    if debug:
+        print "Shifts are:"
+        pprint(list(shifts))
 
     # normalize the intensity of the line scans:
     normalize_lines(lines, progress_label='Normalizing EELS line scans:')
