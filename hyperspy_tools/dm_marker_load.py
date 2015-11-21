@@ -13,12 +13,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-# ##################################################################
-# This file contains the code necessary to measure the spatial shift
-# of EELS line scans from their corresponding STEM signal, and also
-# to shift the line scans and then build them into an array like an
-# areal spectrum image.
-# #################################################################
+# #########################################################################
+# This file contains the code necessary to load a DM survey image and plot
+# it with Hyperspy, adding markers as necessary to show the spatial extents
+# of the spectrum image, beam location, and spatial drift box
+# #########################################################################
 
 from hyperspy import api as hs
 import hyperspy.io_plugins.digital_micrograph as dm
