@@ -492,6 +492,7 @@ def load_shift_and_build_area(c_to_o_stem=None,
                               c_to_o_eels=None,
                               o_to_c_stem=None,
                               o_to_c_eels=None,
+                              shifts=None,
                               smoothing_parm=0.05,
                               return_unshifted=False,
                               return_uncropped=False,
@@ -520,6 +521,10 @@ def load_shift_and_build_area(c_to_o_stem=None,
         in the lists instead. This can be useful when combined with
         ``get_scans_and_eels_fnames()`` so the function can be run multiple
         times without having to click through all the dialogs.
+    shifts: list of floats
+        list of shift amounts to use. Allows one to supply custom shifts for 
+        each line, which will be applied to both the EELS and STEM scans
+        If None, the method will try to figure it out itself
     smoothing_parameter: float or 'ask'
         This is the parameter passed to ``determine_shifts()`` in order to
         figure out how much to smooth the STEM signals before doing all the
@@ -670,14 +675,16 @@ def load_shift_and_build_area(c_to_o_stem=None,
         raise ValueError("All line scans must be same scale for stacking.")
 
     # smooth scans:
-    smoothed_scans = smooth_scans(scans,
-                                  progress_label="Smoothing STEM signals:",
-                                  smoothing_parm=smoothing_parm)
+    if shifts is None:
+        smoothed_scans = smooth_scans(scans,
+                                      progress_label="Smoothing STEM signals:",
+                                      smoothing_parm=smoothing_parm)
 
     # do actual shifting and cropping:
-    shifts = determine_shifts(smoothed_scans,
-                              do_smoothing=False,
-                              debug=debug)
+    if shifts is None:
+        shifts = determine_shifts(smoothed_scans,
+                                  do_smoothing=False,
+                                  debug=debug)
 
     if debug:
         print "Shifts are:"
