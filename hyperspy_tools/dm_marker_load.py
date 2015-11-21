@@ -27,7 +27,11 @@ def plot_survey_with_markers(fname,
                              add_text=True,
                              plot_beam=True,
                              plot_si=True,
-                             plot_drift=True):
+                             plot_drift=True,
+                             x_offset=1.0,
+                             y_offset=1.0,
+                             text_size='xx-small',
+                             **kwargs):
     """
     Plot a hyperspy signal with the markers from digital micrograph enabled
 
@@ -43,20 +47,35 @@ def plot_survey_with_markers(fname,
         Switch to control if spectrum image box or line is plotted (if present)
     plot_drift : bool
         Switch to control if spatial drift box is plotted (if present)
+    x_offset : float
+        multiplier to control how far the text will be offset from its
+        default position (in the x-direction)
+    y_offset : float
+        multiplier to control how far the text will be offset from its
+        default position (in the y-direction)
+    text_size : str or float
+        size of the text that will be written on the image (follows same
+        convention as the `Text
+        <http://matplotlib.org/1.3.0/api/artist_api.html#matplotlib.text.
+        Text.set_size>`_ matplotlib Artist
+    **kwargs
+        Other keyword arguments are passed to hs.signal.plot()
     """
 
     def _add_beam(image, location):
         if plot_beam:
             beam_m = hs.plot.markers.point(x=location[1],
-                                       y=location[0],
-                                       color='red')
+                                           y=location[0],
+                                           color='red')
             image.add_marker(beam_m)
             if add_text:
-                beam_text_m = hs.plot.markers.text(x=location[1] - 0.5,
-                                                   y=location[0] - 1.5,
+                beam_text_m = hs.plot.markers.text(x=location[1] - (0.5 *
+                                                                    x_offset),
+                                                   y=location[0] - (1.5 *
+                                                                    y_offset),
                                                    color='red',
                                                    text='Beam',
-                                                   size='xx-small')
+                                                   size=text_size)
                 image.add_marker(beam_text_m)
         else:
             pass
@@ -73,10 +92,11 @@ def plot_survey_with_markers(fname,
             image.add_marker(si_m)
             if add_text:
                 si_text_m = hs.plot.markers.text(x=location[1],
-                                                 y=location[0] - 0.5,
+                                                 y=location[0] - (0.5 *
+                                                                  y_offset),
                                                  color='#13FF00',
                                                  text='Spectrum Image',
-                                                 size='xx-small')
+                                                 size=text_size)
                 image.add_marker(si_text_m)
         else:
             pass
@@ -91,10 +111,11 @@ def plot_survey_with_markers(fname,
             image.add_marker(drift_m)
             if add_text:
                 drift_text_m = hs.plot.markers.text(x=location[1],
-                                                    y=location[0] - 0.5,
+                                                    y=location[0] - (0.5 *
+                                                                     y_offset),
                                                     color='yellow',
                                                     text='Spatial Drift',
-                                                    size='xx-small')
+                                                    size=text_size)
                 image.add_marker(drift_text_m)
         else:
             pass
@@ -103,6 +124,7 @@ def plot_survey_with_markers(fname,
     flist = dm.file_reader(fname)
     annotation_list = flist[0]['original_metadata']['DocumentObjectList'][
                                'TagGroup0']['AnnotationGroupList']
+    scale = im.axes_manager[0].scale
 
     mapping = {
         'Beam': _add_beam,
@@ -110,13 +132,13 @@ def plot_survey_with_markers(fname,
         'Spatial Drift': _add_drift
     }
 
-    im.plot(cmap='gist_gray')
+    im.plot(cmap='gist_gray', **kwargs)
 
     for i in range(len(annotation_list)):
         try:
             label = annotation_list['TagGroup' + str(i)]['Label']
             loc = annotation_list['TagGroup' + str(i)]['Rectangle']
-            scaled_loc = [im.axes_manager[0].scale * i for i in loc]
+            scaled_loc = [scale * i for i in loc]
             mapping[label](im, scaled_loc)
 
         except KeyError:
