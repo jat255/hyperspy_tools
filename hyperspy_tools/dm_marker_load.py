@@ -23,7 +23,11 @@ from hyperspy import api as hs
 import hyperspy.io_plugins.digital_micrograph as dm
 
 
-def plot_survey_with_markers(fname, add_text=True):
+def plot_survey_with_markers(fname,
+                             add_text=True,
+                             plot_beam=True,
+                             plot_si=True,
+                             plot_drift=True):
     """
     Plot a hyperspy signal with the markers from digital micrograph enabled
 
@@ -31,54 +35,69 @@ def plot_survey_with_markers(fname, add_text=True):
     ----------
     fname : str
         Name of .dm3 file to load
-    add_text : str
+    add_text : bool
         Switch to control if labels for the markers are added to the plot
+    plot_beam : bool
+        Switch to control if beam point is plotted (if present)
+    plot_si : bool
+        Switch to control if spectrum image box or line is plotted (if present)
+    plot_drift : bool
+        Switch to control if spatial drift box is plotted (if present)
     """
 
     def _add_beam(image, location):
-        beam_m = hs.plot.markers.point(x=location[1],
+        if plot_beam:
+            beam_m = hs.plot.markers.point(x=location[1],
                                        y=location[0],
                                        color='red')
-        image.add_marker(beam_m)
-        if add_text:
-            beam_text_m = hs.plot.markers.text(x=location[1] - 0.5,
-                                               y=location[0] - 1.5,
-                                               color='red',
-                                               text='Beam',
-                                               size='xx-small')
-            image.add_marker(beam_text_m)
+            image.add_marker(beam_m)
+            if add_text:
+                beam_text_m = hs.plot.markers.text(x=location[1] - 0.5,
+                                                   y=location[0] - 1.5,
+                                                   color='red',
+                                                   text='Beam',
+                                                   size='xx-small')
+                image.add_marker(beam_text_m)
+        else:
+            pass
 
     def _add_si(image, location):
         # adds a green rectangle (or line, if the coordinates are such) to
         # image
-        si_m = hs.plot.markers.rectangle(x1=location[1],
-                                         y1=location[0],
-                                         x2=location[3],
-                                         y2=location[2],
-                                         color='#13FF00')
-        image.add_marker(si_m)
-        if add_text:
-            si_text_m = hs.plot.markers.text(x=location[1],
-                                             y=location[0] - 0.5,
-                                             color='#13FF00',
-                                             text='Spectrum Image',
-                                             size='xx-small')
-            image.add_marker(si_text_m)
+        if plot_si:
+            si_m = hs.plot.markers.rectangle(x1=location[1],
+                                             y1=location[0],
+                                             x2=location[3],
+                                             y2=location[2],
+                                             color='#13FF00')
+            image.add_marker(si_m)
+            if add_text:
+                si_text_m = hs.plot.markers.text(x=location[1],
+                                                 y=location[0] - 0.5,
+                                                 color='#13FF00',
+                                                 text='Spectrum Image',
+                                                 size='xx-small')
+                image.add_marker(si_text_m)
+        else:
+            pass
 
     def _add_drift(image, location):
-        drift_m = hs.plot.markers.rectangle(x1=location[1],
-                                            y1=location[0],
-                                            x2=location[3],
-                                            y2=location[2],
-                                            color='yellow')
-        image.add_marker(drift_m)
-        if add_text:
-            drift_text_m = hs.plot.markers.text(x=location[1],
-                                                y=location[0] - 0.5,
-                                                color='yellow',
-                                                text='Spatial Drift',
-                                                size='xx-small')
-            image.add_marker(drift_text_m)
+        if plot_drift:
+            drift_m = hs.plot.markers.rectangle(x1=location[1],
+                                                y1=location[0],
+                                                x2=location[3],
+                                                y2=location[2],
+                                                color='yellow')
+            image.add_marker(drift_m)
+            if add_text:
+                drift_text_m = hs.plot.markers.text(x=location[1],
+                                                    y=location[0] - 0.5,
+                                                    color='yellow',
+                                                    text='Spatial Drift',
+                                                    size='xx-small')
+                image.add_marker(drift_text_m)
+        else:
+            pass
 
     im = hs.load(fname)
     flist = dm.file_reader(fname)
