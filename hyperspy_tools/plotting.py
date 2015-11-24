@@ -19,19 +19,90 @@
 # of the spectrum image, beam location, and spatial drift box
 # #########################################################################
 
+import seaborn as sns
+from matplotlib.patches import Rectangle
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
 from hyperspy import api as hs
 import hyperspy.io_plugins.digital_micrograph as dm
 
 
-def plot_survey_with_markers(fname,
-                             add_text=True,
-                             plot_beam=True,
-                             plot_si=True,
-                             plot_drift=True,
-                             x_offset=1.0,
-                             y_offset=1.0,
-                             text_size='xx-small',
-                             **kwargs):
+def add_colored_outlines(fig,
+                         signal,
+                         num_images,
+                         color_palette=sns.color_palette(),
+                         border=0.0,
+                         lw=15):
+    """
+    Add outlines to a matplotlib figure to make it easy to visualize with
+    the plotted spectra
+
+    Parameters
+    ----------
+    fig: matplotlib figure
+        figure to which to add outlines (this should not have colorbars,
+        add them later
+    signal: Hyperspy signal
+        signal that has calibrated axes (in order to set bounds of rectangle)
+    num_images: int
+        number of images in figure
+    color_palette: list
+        list of colors to use for outlines
+    border: float
+        offset of rectangle from edge of data
+    lw: float
+        width of rectangle lines to plot
+    """
+    x, y = signal.axes_manager[0].high_value, signal.axes_manager[1].high_value
+
+    for i in range(num_images):
+        ax = fig.get_axes()[num_images - 1 - i]
+        r = Rectangle((border, border),
+                      x - 1.5 * border,
+                      y - 1.5 * border,
+                      fill=False,
+                      edgecolor=color_palette[3 - i],
+                      alpha=1,
+                      linewidth=lw)
+        ax.add_patch(r)
+
+
+def add_custom_colorbars(fig,
+                         tick_list):
+    """
+    Add custom colorbars with at specified values
+
+    Parameters
+    ----------
+    fig: matplotlib figure
+        figure to which to add colorbars (should not currently have colorbars)
+    tick_list: list
+        nested list with the position of ticks to be added to colorbars;
+        should have a length equal to the number of images in the figure
+        Example for a four plot figure:
+            tick_list =  [[120,200,280],
+                          [4,20,36],
+                          [0,8,16],
+                          [0,22,44]]
+    """
+    for i, a in enumerate(fig.axes):
+        if i == 2:
+            a.get_images()[0].set_clim(0,16)
+        div = make_axes_locatable(a)
+        cax = div.append_axes("right", size="5%", pad=0.05)
+        _ = fig.colorbar(a.get_images()[0],cax=cax, ticks=tick_list[i])
+
+
+
+def plot_dm3_survey_with_markers(fname,
+                                 add_text=True,
+                                 plot_beam=True,
+                                 plot_si=True,
+                                 plot_drift=True,
+                                 x_offset=1.0,
+                                 y_offset=1.0,
+                                 text_size='xx-small',
+                                 **kwargs):
     """
     Plot a hyperspy signal with the markers from digital micrograph enabled
 
