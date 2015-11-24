@@ -22,9 +22,52 @@
 import seaborn as sns
 from matplotlib.patches import Rectangle
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import hyperspy
 
 from hyperspy import api as hs
 import hyperspy.io_plugins.digital_micrograph as dm
+
+
+def fit_peak(sig, lower_bound, upper_bound, factor_num=None,):
+    """
+    Fit a Gaussian peak in a range to a signal
+
+    Parameters
+    ----------
+    sig: hyperspy signal
+    lower_bound: float
+    upper_bound: float
+    factor_num: int
+        if given, fit to a decomposition component of the signal
+
+    Returns
+    -------
+    center of the fitted Gaussian
+    """
+    if factor_num is not None:
+        c1 = sig.get_decomposition_factors()[factor_num]
+    else:
+        c1 = sig
+
+    if isinstance(sig, hyperspy._signals.spectrum.Spectrum):
+        is_eels = False
+    else:
+        is_eels = True
+
+    if is_eels:
+        c1.set_microscope_parameters(beam_energy=200,
+                                     convergence_angle=12,
+                                     collection_angle=29)
+        m1 = hs.create_model(c1, auto_background=False)
+    else:
+        m1 = hs.create_model(c1)
+    g1 = hyperspy.components.Gaussian(centre=((float(lower_bound) +
+                                         upper_bound) / 2.0))
+    m1.append(g1)
+    m1.set_signal_range(lower_bound,upper_bound)
+    m1.fit()
+    m1.plot()
+    return g1.centre.value
 
 
 def add_colored_outlines(fig,
@@ -56,21 +99,21 @@ def add_colored_outlines(fig,
     x, y = signal.axes_manager[0].high_value, signal.axes_manager[1].high_value
 
     for i in range(num_images):
-        ax = fig.get_axes()[num_images - 1 - i]
+        ax = fig.get_axes()[num_images - (1 + i)]
         r = Rectangle((border, border),
                       x - 1.5 * border,
                       y - 1.5 * border,
                       fill=False,
-                      edgecolor=color_palette[3 - i],
+                      edgecolor=color_palette[num_images - (1 + i)],
                       alpha=1,
                       linewidth=lw)
         ax.add_patch(r)
 
 
 def add_custom_colorbars(fig,
-                         tick_list):
+                         tick_list=None):
     """
-    Add custom colorbars with at specified values
+    Add custom colorbars with ticks at specified values
 
     Parameters
     ----------
@@ -86,11 +129,14 @@ def add_custom_colorbars(fig,
                           [0,22,44]]
     """
     for i, a in enumerate(fig.axes):
-        if i == 2:
-            a.get_images()[0].set_clim(0,16)
+        # if i == 2:
+        #     a.get_images()[0].set_clim(0,16)
         div = make_axes_locatable(a)
         cax = div.append_axes("right", size="5%", pad=0.05)
-        _ = fig.colorbar(a.get_images()[0],cax=cax, ticks=tick_list[i])
+        if tick_list is None:
+            _ = fig.colorbar(a.get_images()[0],cax=cax)
+        else:
+            _ = fig.colorbar(a.get_images()[0],cax=cax, ticks=tick_list[i])
 
 
 

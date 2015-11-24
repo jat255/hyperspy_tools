@@ -16,6 +16,7 @@
 from plotting import plot_dm3_survey_with_markers
 from plotting import add_colored_outlines
 from plotting import add_custom_colorbars
+from plotting import fit_peak
 
 from shifting_lines import load_shift_and_build_area
 from shifting_lines import normalize_lines
