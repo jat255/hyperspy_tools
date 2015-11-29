@@ -147,6 +147,7 @@ def plot_dm3_survey_with_markers(fname,
                                  plot_drift=True,
                                  x_offset=1.0,
                                  y_offset=1.0,
+                                 im_scale=1.0,
                                  text_size='xx-small',
                                  **kwargs):
     """
@@ -170,6 +171,9 @@ def plot_dm3_survey_with_markers(fname,
     y_offset : float
         multiplier to control how far the text will be offset from its
         default position (in the y-direction)
+    im_scale : float
+        will scale the survey image by a given factor (useful for correcting
+        image scale bars if the calibration is incorrect)
     text_size : str or float
         size of the text that will be written on the image (follows same
         convention as the `Text
@@ -241,6 +245,9 @@ def plot_dm3_survey_with_markers(fname,
     flist = dm.file_reader(fname)
     annotation_list = flist[0]['original_metadata']['DocumentObjectList'][
                                'TagGroup0']['AnnotationGroupList']
+
+    im.axes_manager[0].scale *= im_scale
+    im.axes_manager[1].scale *= im_scale
     scale = im.axes_manager[0].scale
 
     mapping = {
