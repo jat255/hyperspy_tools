@@ -24,8 +24,11 @@ import numpy as np
 import sys
 import re
 from pprint import pprint
+from scipy import stats
+from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
 
-from hyperspy import hspy as hs
+import hyperspy.api as hs
 from PyQt4 import QtGui, QtCore
 from progressbar import ProgressBar, Percentage, Bar, ETA
 
@@ -178,6 +181,118 @@ def shift_lines(lines,
     return shifted_lines
 
 
+def shift_area_stem(stem_s,
+                    stem_list=None,
+                    shifts=None,
+                    crop_scan=True,
+                    do_smoothing=True,
+                    reset_origin=False,
+                    smoothing_parameter=0.05,
+                    ):
+    """
+    Shift a HAADF STEM signal to have a straight interface, returning a new
+    Hyperspy signal with the same calibration as the original.
+    Only shifts scans in the x-direction (vertical interface).
+    If needed, get the shifts required from the area scan.
+
+    Parameters
+    ----------
+    stem_s: HyperSpy signal with signal dimension > 1
+        Should be a HAADF STEM image loaded into hyperspy that will be shifted
+    stem_list: list
+        list of stem signals (as output by `get_shifts_from_area_stem`.
+        Providing this will save a little time extracting the scans again,
+        but is honestly not very necessary
+    shifts: list or None
+        list of shifts to use. If None, they will be determined automatically
+    crop_scan: bool
+        Whether or not the resulting image should be cropped to lose the
+        blank pixels resulting from shifting
+    reset_origin: bool
+        Whether or not to reset the origin of the x-axis to zero after cropping
+    do_smoothing: bool
+        Whether to smooth the signal before finding shifts
+    smoothing_parameter: float
+        parameter supplied to `determine_shifts` to define how much to
+        smooth the data while finding the shift values
+    """
+    if shifts is None:
+        stem_list, shifts = \
+            get_shifts_from_area_stem(stem_s,
+                                      do_smoothing=do_smoothing,
+                                      smoothing_parameter=smoothing_parameter)
+
+    if stem_list is None:
+        stem_list = [stem_s.isig[:, i] for i in
+                     range(stem_s.data.shape[0])]
+
+    shifted_stem_list = shift_lines(stem_list, shifts)
+
+    # Copy signal so calibration is right
+    shifted_s = stem_s.deepcopy()
+    shifted_s.data = hs.stack(shifted_stem_list).data
+    shifted_s.metadata.General.title += ' shifted'
+
+    if crop_scan:
+        shifted_s = crop_area_scan(shifted_s, shifts)
+        if reset_origin:
+            shifted_s.axes_manager[0].offset = 0
+
+    return shifted_s
+
+
+def shift_area_eels(eels_s,
+                    shifts,
+                    crop_scan=True,
+                    reset_origin=False):
+    lines = [eels_s.inav[:, i] for i in range(eels_s.data.shape[0])]
+    shifted_lines = shift_lines(lines,
+                                shifts,
+                                progress_label='Shifting EELS line scans:')
+
+    # Copy signal so calibration is right
+    shifted_s = eels_s.deepcopy()
+    shifted_s.data = hs.stack(shifted_lines).data
+    shifted_s.metadata.General.title += ' shifted'
+
+    if crop_scan:
+        shifted_s = crop_area_scan(shifted_s, shifts)
+        if reset_origin:
+            shifted_s.axes_manager[0].offset = 0
+
+    return shifted_s
+
+
+
+def get_shifts_from_area_stem(stem_s, **kwargs):
+    """
+    Get the shifts required from an area scan. Scan will be split into
+    'line-scans' in the horizontal dimension
+
+    Parameters
+    ----------
+    stem_s: HyperSpy signal with signal dimension > 1
+        Should be a HAADF STEM image loaded into hyperspy that will be used
+        to determine the needed shifts
+    **kwargs:
+        additional keyword arguments will be passed to `determine_shifts`
+
+    Returns
+    -------
+    stem_list: list
+        List of stem line scans
+    shifts: np.array
+        NumPy array of shift values in the x-direction (length of array is
+        same as size of original signal in the y-direction)
+    """
+    stem_list = [stem_s.isig[:, i] for i in
+                 range(stem_s.data.shape[0])]
+
+    shifts = determine_shifts(stem_list, **kwargs)
+
+    return stem_list, shifts
+
+
 def smooth_scan(scan,
                 smoothing_parm=0.05):
     """
@@ -258,7 +373,7 @@ def smooth_scans(scans,
         else:
             print 'User cancelled input. Terminating.'
             sys.exit(1)
-        # input_d.exit()
+            # input_d.exit()
 
     if show_progressbar:
         widgets = [progress_label, Percentage(), ' ', Bar(), ' ', ETA()]
@@ -272,9 +387,42 @@ def smooth_scans(scans,
     return smoothed_scans
 
 
+def _interp_spectrum(stem_s, step_size, kind='cubic'):
+    """
+    Interpolate a signal onto a finer mesh (for subpixel accuracy)
+
+    Parameters
+    ----------
+    stem_s: HyperSpy spectrum
+        signal to interpolate
+    step_size: float
+        step size to use for interpolation
+    kind: str
+        kind of interpolation function to use (as defined in
+        `scipy.interpolate.interp1d`)
+    """
+    # Create interpolation function
+    f = interp1d(stem_s.axes_manager[0].axis, stem_s.data, kind=kind)
+
+    # Define interpolation mesh
+    ax_m = stem_s.axes_manager[0]
+    int_range = np.arange(ax_m.axis[0], ax_m.axis[-1], step=step_size)
+
+    # Create and fix calibration of interpolated signal
+    int_s = hs.signals.Spectrum(f(int_range))
+    int_s.axes_manager[0].offset = stem_s.axes_manager[0].offset
+    int_s.axes_manager[0].scale = step_size
+    int_s.axes_manager[0].units = stem_s.axes_manager[0].units
+    int_s.axes_manager[0].name = stem_s.axes_manager[0].name
+    int_s.metadata.General.title = \
+        stem_s.metadata.General.title + ' - interpolated'
+
+    return int_s
+
+
 def determine_shifts(scans,
-                     flip_scans=None,
-                     do_smoothing=True,
+                     interp_step=0.001,
+                     do_smoothing=False,
                      smoothing_parameter=0.05,
                      debug=False):
     """
@@ -285,22 +433,17 @@ def determine_shifts(scans,
     scans: list of Signals
         scans is a list of Hyperspy signals that represent STEM signal scans
          (that match up with a series of line scans)
-    flip_scans: boolean or None
-        switch to determine whether or not the scan should be flipped before
-        calculating the derivative and finding the max (since we don't have a
-        function that determines a minimum in a spectrum).
-        The data must be in the order that the profile is increasing
-        (i.e. like it is going from SiO2 to SiC)
-        If value is None, function will attempt to determine whether or not
-        flipping is needed.
+    interp_step: float
+        step size to use for interpolation in `_interp_spectrum`
     do_smoothing: boolean
+        ** Deprecated in favor of the interpolation scheme used instead **
         whether or not smoothing will be done. Disabling is useful in case
         you have already smoothed the scans ahead of time.
     smoothing_parameter: float or str
-        amount to smooth (with Lowess filter) the scan before taking the
+        ** Deprecated in favor of the interpolation scheme used instead **
+    amount to smooth (with Lowess filter) the scan before taking the
         derivative. The default of 0.05 seems to work well for typical STEM
-        scans.
-        If 'ask', a dialog box will be risen asking for the factor
+        scans. If 'ask', a dialog box will be risen asking for the factor
     debug: boolean
         switch whether debugging information is printed out to see the shift
         values and everything
@@ -313,60 +456,62 @@ def determine_shifts(scans,
     """
     mids = np.zeros(len(scans))
 
-    # auto determine if flipping is necessary by looking at first scan:
-    if flip_scans is None:
-        # if average of first five data points is higher than the last five,
-        # it is a decreasing scan and we need to flip it
-        first = scans[0].data[0:5].mean()
-        last = scans[0].data[len(scans[0].data) - 6:
-                             len(scans[0].data) - 1].mean()
-        if first > last:
-            if debug:
-                print "Flipping scans"
-            flip_scans = True
-        else:
-            if debug:
-                print "Not flipping scans"
-            flip_scans = False
-
     # smooth the scans:
     if do_smoothing:
         smoothed_scans = smooth_scans(scans,
                                       smoothing_parm=smoothing_parameter,
                                       progress_label="Smoothing STEM scans:")
+        # hs.plot.plot_spectra(smoothed_scans, style='overlap')
     else:
         smoothed_scans = scans
 
+    # Rather than derivative, let's try using another heuristic
     for i, stem in enumerate(smoothed_scans):
-        if flip_scans:
-            # if needed, flip the data so the profile is increasing
-            stem.data = stem.data[::-1]
+        interp = _interp_spectrum(stem, interp_step)
 
-        deriv = stem.diff(0)
-        midpoint = smoothed_scans[i].axes_manager[0].index2value(deriv
-                                                                 .indexmax(0)
-                                                                 .data)
+        ########################################################
+        # ### New midpoint heuristic using interpolated data ###
+        ########################################################
+        n = 3
+        first_data_i = interp.data[:n].mean()   # y-average of first N x-pixels
+        last_data_i = interp.data[-n:].mean()   # y-average of last N x-pixels
+        # y-average of the high and low marks
+        mid_y_data_i = np.array([first_data_i, last_data_i]).mean()
+
+        # subtract the mid y-value from the data
+        subtracted_sig = interp - mid_y_data_i
+        # take absolute value of this, so we can find the index of the
+        # smallest difference (index of point on signal closest to the
+        # midpoint)
+        subtracted_sig.data = np.absolute(subtracted_sig.data)
+        mid_idx = (subtracted_sig * -1).indexmax(0).data[0]
+        midpoint = interp.axes_manager[0].index2value(mid_idx)
+
+        # ### Old derivative heuristic ###
+        # deriv = stem.diff(0)
+        # midpoint = smoothed_scans[i].axes_manager[0].index2value(deriv
+        #                                                          .indexmax(0)
+        #                                                          .data)
+
         mids[i] = midpoint
-        i += 1
+        y_mp = interp.data[interp.axes_manager[0].value2index(
+            midpoint)]
+
+        if debug:
+            # Print midpoint data and plot the data
+            print("({}, {})".format(midpoint, y_mp))
+            interp.plot()
+            plt.scatter(midpoint, y_mp)
 
     shifts = mids - np.mean(mids)
 
     if debug:
-        print "Mids are:"
-        pprint(list(mids))
+        # print "Mids are:"
+        # pprint(list(mids))
         print "Mean mids is %g" % np.mean(mids)
 
-    # we need the negative of shifts for actual shifting. If we had to
-    # flip the scans, this is already taken care of, but if not
-    # then we should return the negative amount
-    if flip_scans:
-        if debug:
-            print "RETURNING SHIFTS"
-        return shifts
-    else:
-        if debug:
-            print "RETURNING SHIFTS*-1"
-        return shifts * -1
+    # we need the negative of shifts for actual shifting
+    return shifts * -1
 
 
 def normalize_lines(lines,
@@ -444,7 +589,10 @@ def crop_area_scan(area_scan, shifts):
 
     # min_shift is amount that we need to crop on the right
     # we subtract one pixel just to make sure we get rid of all
-    min_shift = shifts[shifts < 0].min() - axis.scale
+    try:
+        min_shift = shifts[shifts < 0].min() - axis.scale
+    except ValueError:
+        min_shift = 0
     # max_shift is amount we need to crop on the left
     # again, we add one pixel to make sure we get rid of all
     max_shift = shifts[shifts > 0].max() + axis.scale
@@ -573,6 +721,7 @@ def load_shift_and_build_area(c_to_o_stem=None,
                 Hyperspy signal containing the unshifted EELS line scans
                 as an area scan, rather than a list of single line scans
     """
+
     def _check_list_equal(iterator):
         # will return whether all items in list are the same or not
         return len(set(iterator)) <= 1
