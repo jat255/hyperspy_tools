@@ -100,9 +100,10 @@ setup(
     install_requires=['numpy>=1.9.1',
                       'matplotlib>=1.4.2',
                       'scipy>=0.15.1',
-                      #                    'hyperspy>=0.8',
-                      'progressbar>=2.3', 'seaborn',
-                      #                      'PyQt4>=4.11.3'
+                      # 'hyperspy>=0.8',
+                      'progressbar2',
+                      'seaborn',
+                      # 'PyQt4>=4.11.3'
                       ],
 
     # List additional groups of dependencies here (e.g. development dependencies).
