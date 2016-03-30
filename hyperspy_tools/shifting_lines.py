@@ -186,7 +186,7 @@ def shift_area_stem(stem_s,
                     shifts=None,
                     crop_scan=True,
                     do_smoothing=True,
-                    reset_origin=False,
+                    reset_origin=True,
                     smoothing_parameter=0.05,
                     ):
     """
@@ -215,6 +215,11 @@ def shift_area_stem(stem_s,
     smoothing_parameter: float
         parameter supplied to `determine_shifts` to define how much to
         smooth the data while finding the shift values
+
+    Returns
+    -------
+    shifted_s: HyperSpy signal
+        shifted STEM signal
     """
     if shifts is None:
         stem_list, shifts = \
@@ -244,7 +249,29 @@ def shift_area_stem(stem_s,
 def shift_area_eels(eels_s,
                     shifts,
                     crop_scan=True,
-                    reset_origin=False):
+                    reset_origin=True):
+    """
+    Shift an EELS SI signal to have a straight interface, returning a new
+    Hyperspy signal with the same calibration as the original.
+    Only shifts scans in the x-direction (vertical interface).
+
+    Parameters
+    ----------
+    eels_s: HyperSpy signal with signal dimension > 1
+        Should be a HAADF STEM image loaded into hyperspy that will be shifted
+    shifts: list
+        list of shifts to use. Can be obtained from `get_shifts_from_area_stem`
+    crop_scan: bool
+        Whether or not the resulting image should be cropped to lose the
+        blank pixels resulting from shifting
+    reset_origin: bool
+        Whether or not to reset the origin of the x-axis to zero after cropping
+
+    Returns
+    -------
+    shifted_s: HyperSpy signal
+        shifted EELS SI signal
+    """
     lines = [eels_s.inav[:, i] for i in range(eels_s.data.shape[0])]
     shifted_lines = shift_lines(lines,
                                 shifts,
@@ -472,20 +499,42 @@ def determine_shifts(scans,
         ########################################################
         # ### New midpoint heuristic using interpolated data ###
         ########################################################
-        n = 3
-        first_data_i = interp.data[:n].mean()   # y-average of first N x-pixels
-        last_data_i = interp.data[-n:].mean()   # y-average of last N x-pixels
-        # y-average of the high and low marks
-        mid_y_data_i = np.array([first_data_i, last_data_i]).mean()
+        # Rather than using the first n pixels, let's find the global
+        # min/max and base our midpoint off of that, making sure that the
+        # mid value that we find is between the min/max. This prevents
+        # oscillations in the left and right side of the profile from having
+        # strong effects
+        #   # Older method:
+        #   n = 3
+        #   # y-average of first N x-pixels
+        #   first_data_i = interp.data[:n].mean()
+        #   # y-average of last N x-pixels
+        #   last_data_i = interp.data[-n:].mean()
+        interp2 = interp.deepcopy()
+        interp2.data.sort()             # sort data so we can get min/max
+        low_10 = interp2.data[:0.1 * len(interp2.data)].mean()
+        high_10 = interp2.data[0.9 * len(interp2.data):].mean()
 
-        # subtract the mid y-value from the data
-        subtracted_sig = interp - mid_y_data_i
+        # Find index location in profile of global min/max,
+        # as well as the axes value of this position
+        high_idx = int(np.argwhere(interp.data > high_10).mean())
+        low_idx = int(np.argwhere(interp.data < low_10).mean())
+        a = interp.axes_manager[0]
+        min_x = a.index2value(low_idx)
+        max_x = a.index2value(high_idx)
+        min_x, max_x = sorted([min_x, max_x])   # sort list so min is < max
+
+        # y-average of the high and low marks
+        mid_y_data_i = np.array([low_10, high_10]).mean()
+
+        # subtract the mid y-value from the data (only between the min/max)
+        subtracted_sig = interp.isig[min_x:max_x] - mid_y_data_i
         # take absolute value of this, so we can find the index of the
         # smallest difference (index of point on signal closest to the
         # midpoint)
         subtracted_sig.data = np.absolute(subtracted_sig.data)
         mid_idx = (subtracted_sig * -1).indexmax(0).data[0]
-        midpoint = interp.axes_manager[0].index2value(mid_idx)
+        midpoint = interp.axes_manager[0].index2value(mid_idx) + min_x
 
         # ### Old derivative heuristic ###
         # deriv = stem.diff(0)
