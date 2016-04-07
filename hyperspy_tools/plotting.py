@@ -24,7 +24,7 @@ from matplotlib.patches import Rectangle
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import hyperspy
 
-from hyperspy import api as hs
+import hyperspy.api as hs
 import hyperspy.io_plugins.digital_micrograph as dm
 
 
@@ -58,13 +58,13 @@ def fit_peak(sig, lower_bound, upper_bound, factor_num=None,):
         c1.set_microscope_parameters(beam_energy=200,
                                      convergence_angle=12,
                                      collection_angle=29)
-        m1 = hs.create_model(c1, auto_background=False)
+        m1 = c1.create_model(auto_background=False)
     else:
-        m1 = hs.create_model(c1)
-    g1 = hyperspy.components.Gaussian(centre=((float(lower_bound) +
-                                         upper_bound) / 2.0))
+        m1 = c1.create_model()
+    g1 = hs.model.components.Gaussian(centre=((float(lower_bound) +
+                                               upper_bound) / 2.0))
     m1.append(g1)
-    m1.set_signal_range(lower_bound,upper_bound)
+    m1.set_signal_range(lower_bound, upper_bound)
     m1.fit()
     m1.plot()
     return g1.centre.value
@@ -137,7 +137,6 @@ def add_custom_colorbars(fig,
             _ = fig.colorbar(a.get_images()[0],cax=cax)
         else:
             _ = fig.colorbar(a.get_images()[0],cax=cax, ticks=tick_list[i])
-
 
 
 def plot_dm3_survey_with_markers(fname,
