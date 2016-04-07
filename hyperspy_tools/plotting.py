@@ -49,6 +49,7 @@ def fit_peak(sig, lower_bound, upper_bound, factor_num=None,):
     else:
         c1 = sig
 
+    # noinspection PyUnresolvedReferences,PyProtectedMember
     if isinstance(sig, hyperspy._signals.spectrum.Spectrum):
         is_eels = False
     else:
@@ -84,7 +85,7 @@ def add_colored_outlines(fig,
     ----------
     fig: matplotlib figure
         figure to which to add outlines (this should not have colorbars,
-        add them later
+        add them later)
     signal: Hyperspy signal
         signal that has calibrated axes (in order to set bounds of rectangle)
     num_images: int
@@ -100,6 +101,7 @@ def add_colored_outlines(fig,
 
     for i in range(num_images):
         ax = fig.get_axes()[num_images - (1 + i)]
+        # noinspection PyUnresolvedReferences
         r = Rectangle((border, border),
                       x - 1.5 * border,
                       y - 1.5 * border,
@@ -134,9 +136,10 @@ def add_custom_colorbars(fig,
         div = make_axes_locatable(a)
         cax = div.append_axes("right", size="5%", pad=0.05)
         if tick_list is None:
-            _ = fig.colorbar(a.get_images()[0],cax=cax)
+            _ = fig.colorbar(a.get_images()[0], cax=cax)
         else:
-            _ = fig.colorbar(a.get_images()[0],cax=cax, ticks=tick_list[i])
+            # noinspection PyUnresolvedReferences
+            _ = fig.colorbar(a.get_images()[0], cax=cax, ticks=tick_list[i])
 
 
 def plot_dm3_survey_with_markers(fname,
@@ -180,6 +183,13 @@ def plot_dm3_survey_with_markers(fname,
         Text.set_size>`_ matplotlib Artist
     **kwargs
         Other keyword arguments are passed to hs.signal.plot()
+
+    Returns
+    -------
+    im: hyperspy._signals.image.Image
+        HyperSpy signal with markers added. While the figure is open,
+        the figure can be saved with a call such as
+        ``im._plot.signal_plot.figure.savefig()``
     """
 
     def _add_beam(image, location):
@@ -266,4 +276,6 @@ def plot_dm3_survey_with_markers(fname,
 
         except KeyError:
             pass
-    return im # Returns a hyperspy._signals.image.Image, and with it all editing and saving capabilites.
+
+    return im   # Returns a hyperspy._signals.image.Image, and with it all
+    #           editing and saving capabilities.
