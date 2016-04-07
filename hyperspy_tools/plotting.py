@@ -267,3 +267,4 @@ def plot_dm3_survey_with_markers(fname,
 
         except KeyError:
             pass
+    return im # Returns a hyperspy._signals.image.Image, and with it all editing and saving capabilites.
