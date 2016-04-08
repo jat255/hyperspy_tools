@@ -18,7 +18,7 @@ MOCK_MODULES = ['numpy', 'sip', 'matplotlib', 'matplotlib.pyplot',
                 'hyperspy.io_plugins',
                 'hyperspy.io_plugins.digital_micrograph', 'PyQt4',
                 'PyQt4.QtCore', 'PyQt4.QtGui', 'seaborn', 'hyperspy', 'scipy',
-                'scipy.interpolate']
+                'scipy.interpolate', 'tqdm']
 
 for mod_name in MOCK_MODULES:
     sys.modules[mod_name] = Mock()
