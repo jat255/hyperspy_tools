@@ -20,6 +20,7 @@
 # #########################################################################
 
 import seaborn as sns
+import matplotlib
 from matplotlib.patches import Rectangle
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import hyperspy
@@ -28,21 +29,32 @@ import hyperspy.api as hs
 import hyperspy.io_plugins.digital_micrograph as dm
 
 
+__all__ = ['fit_peak',
+           'add_colored_outlines',
+           'add_custom_colorbars',
+           'plot_dm3_survey_with_markers']
+
+
 def fit_peak(sig, lower_bound, upper_bound, factor_num=None,):
     """
     Fit a Gaussian peak in a range to a signal
 
     Parameters
     ----------
-    sig: hyperspy signal
+    sig: ~hyperspy.signal.Signal
+        Signal to fit
     lower_bound: float
+        Lower bound of values in which to fit
     upper_bound: float
+        Upper bound of values in which to fit
     factor_num: int
-        if given, fit to a decomposition component of the signal
+        if given, the fit will be performed on a decomposition component of
+        the signal (given by ``factor_num``), rather than the signal itself
 
     Returns
     -------
-    center of the fitted Gaussian
+    centre: float
+        center of the fitted Gaussian
     """
     if factor_num is not None:
         c1 = sig.get_decomposition_factors()[factor_num]
@@ -68,7 +80,10 @@ def fit_peak(sig, lower_bound, upper_bound, factor_num=None,):
     m1.set_signal_range(lower_bound, upper_bound)
     m1.fit()
     m1.plot()
-    return g1.centre.value
+
+    centre = g1.centre.value
+
+    return centre
 
 
 def add_colored_outlines(fig,
@@ -83,10 +98,10 @@ def add_colored_outlines(fig,
 
     Parameters
     ----------
-    fig: matplotlib figure
+    fig: matplotlib.figure
         figure to which to add outlines (this should not have colorbars,
         add them later)
-    signal: Hyperspy signal
+    signal: ~hyperspy.signal.Signal
         signal that has calibrated axes (in order to set bounds of rectangle)
     num_images: int
         number of images in figure
@@ -119,16 +134,16 @@ def add_custom_colorbars(fig,
 
     Parameters
     ----------
-    fig: matplotlib figure
+    fig: matplotlib.figure
         figure to which to add colorbars (should not currently have colorbars)
     tick_list: list
         nested list with the position of ticks to be added to colorbars;
         should have a length equal to the number of images in the figure
         Example for a four plot figure:
-            tick_list =  [[120,200,280],
-                          [4,20,36],
-                          [0,8,16],
-                          [0,22,44]]
+            >>> tick_list =  [[120,200,280],
+            ...               [4,20,36],
+            ...               [0,8,16],
+            ...               [0,22,44]]
     """
     for i, a in enumerate(fig.axes):
         # if i == 2:

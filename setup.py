@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from setuptools import setup, find_packages  # Always prefer setuptools over distutils
+from setuptools import setup, find_packages  # Always prefer setuptools
 from codecs import open  # To use a consistent encoding
 from os import path
 import io
@@ -49,10 +49,13 @@ setup(
     # Versions should comply with PEP440.  For a discussion on single-sourcing
     # the version across setup.py and the project code, see
     # https://packaging.python.org/en/latest/single_source_version.html
-    version=find_version('hyperspy_tools/hyperspy_tools.py'),
+    version=find_version('hyperspy_tools/__init__.py'),
 
     description='Python modules providing useful tools for use in HyperSpy',
-    long_description=long_description,
+    long_description='This package supplies a reference point for useful '
+                     'scripts that have been developed for use with '
+                     'HyperSpy, a hyperspectral data analysis package. '
+                     '(see http://www.hyperspy.org)',
 
     # The project's main homepage.
     url='https://github.com/jat255/hyperspy_tools',
@@ -70,20 +73,19 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 4 - Beta',
+        'Development Status :: 3 - Alpha',
 
         # Indicate who your project is intended for
         'Intended Audience :: Science/Research',
-        'Topic :: Material Characterization :: TEM',
-        'Topic :: Material Characterization :: EELS',
-        'Topic :: Material Characterization :: EDS',
+        'Topic :: Scientific/Engineering',
 
         # Pick your license as you wish (should match "license" above)
-        'License :: OSI Approved :: GNU General Public License v3',
+        'License :: OSI Approved :: Apache Software License',
 
         # Specify the Python versions you support here. In particular, ensure
         # that you indicate whether you support Python 2, Python 3 or both.
-        'Programming Language :: Python :: 2.7.9',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 2.7',
     ],
 
     # What does your project relate to?
@@ -93,46 +95,24 @@ setup(
     # simple. Or you can use find_packages().
     packages=find_packages(exclude=['contrib', 'docs', 'tests*']),
 
-    # List run-time dependencies here.  These will be installed by pip when your
+    # List run-time dependencies here. These will be installed by pip when your
     # project is installed. For an analysis of "install_requires" vs pip's
     # requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['numpy>=1.9.1',
-                      'matplotlib>=1.4.2',
-                      'scipy>=0.15.1',
-                      # 'hyperspy>=0.8',
-                      'progressbar2',
-                      'seaborn',
-                      # 'PyQt4>=4.11.3'
-                      ],
+    install_requires=[],
 
-    # List additional groups of dependencies here (e.g. development dependencies).
-    # You can install these using the following syntax, for example:
-    # $ pip install -e .[dev,test]
-    # extras_require = {
-    #     'dev': ['check-manifest'],
-    #     'test': ['coverage'],
-    # },
-
-    # If there are data files included in your packages that need to be
-    # installed, specify them here.  If using Python 2.6 or less, then these
-    # have to be included in MANIFEST.in as well.
-    # package_data={
-    #     'sample': ['package_data.dat'],
-    # },
-
-    # Although 'package_data' is the preferred approach, in some case you may
-    # need to place data files outside of your packages.
-    # see http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files
-    # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
-    # data_files=[('my_data', ['data/data_file'])],
-
-    # To provide executable scripts, use entry points in preference to the
-    # "scripts" keyword. Entry points provide cross-platform support and allow
-    # pip to create the appropriate form of executable for the target platform.
-    # entry_points={
-    #     'console_scripts': [
-    #         'sample=sample:main',
-    #     ],
-    # },
+    extras_require={
+        'full': ['numpy >= 1.9.1', #
+                 'matplotlib>=1.4.2', #
+                 'scipy>=0.15.1', #
+                 'hyperspy>=0.8', #
+                 'seaborn', #
+                 'tqdm', #
+                 'PyQt4>=4.11.3',
+                 'h5py',
+                 'scikit-image',
+                 'docopt',
+                 'pandas'], #
+        'base': [],
+    },
 )

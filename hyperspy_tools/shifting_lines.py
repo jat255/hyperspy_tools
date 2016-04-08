@@ -24,36 +24,56 @@ import numpy as np
 import sys
 import re
 from pprint import pprint
-from scipy import stats
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
 import hyperspy.api as hs
 from PyQt4 import QtGui, QtCore
-from progressbar import ProgressBar, Percentage, Bar, ETA
+from tqdm import tqdm
+
+__all__ = ['get_shifts_from_area_stem',
+           'shift_area_stem',
+           'determine_shifts',
+           '_interp_spectrum',
+           'shift_line_scan',
+           'shift_lines',
+           'crop_area_scan',
+           'shift_area_eels',
+           'smooth_scan',
+           'smooth_scans',
+           'normalize_lines',
+           'get_scans_and_eels_fnames',
+           'load_shift_and_build_area',
+           '_natural_sort',
+           'gui_fnames']
 
 
 def _natural_sort(l):
     """
     Internal function to sort a list naturally (10 comes after 9)
-    (from: http://stackoverflow.com/questions/4836710/does-python-have-a-
-    built-in-function-for-string-natural-sort)
+    (from: `StackOverflow <http://stackoverflow.com/questions/4836710/does
+    -python-have-a-built-in-function-for-string-natural-sort>`_)
 
-    Parameters:
+    Parameters
     -----------
     l: list
         list of values to sort naturally
 
-    Returns:
+    Returns
     --------
-    sorted list
+    s_l: list
+        list sorted naturally
     """
-    convert = lambda text: int(text) if text.isdigit() else text.lower()
-    alphanum_key = lambda key: [convert(c) for c in re.split('([0-9]+)', key)]
-    return sorted(l, key=alphanum_key)
+    def convert(text): int(text) if text.isdigit() else text.lower()
+
+    def alphanum_key(key): [convert(c) for c in re.split('([0-9]+)', key)]
+
+    s_l = sorted(l, key=alphanum_key)
+
+    return s_l
 
 
-# noinspection PyTypeCheckerInspection
+# noinspection PyTypeCheckerInspection,PyArgumentList,PyTypeChecker
 def gui_fnames(title=None, directory=None):
     """
     Select a file via a dialog and returns the file name.
@@ -66,9 +86,9 @@ def gui_fnames(title=None, directory=None):
     directory: str or None
         Directory to use as the starting directory for the file chooser
 
-    Returns:
-    --------
-    fname: str or list
+    Returns
+    -------
+    fnames: list
         single string or list of strings representing file(s) that were
         selected using the file chooser dialog
     """
@@ -77,14 +97,16 @@ def gui_fnames(title=None, directory=None):
     if directory is None:
         directory = './'
     if QtGui.QApplication.instance() is None:
-        app = QtGui.QApplication(sys.argv)
+        _ = QtGui.QApplication(sys.argv)
     fname = QtGui.QFileDialog.getOpenFileNames(None,
                                                title,
                                                directory,
                                                filter='All files (*)')
     # app.exit()
 
-    return [str(name) for name in fname]
+    fnames = [str(name) for name in fname]
+
+    return fnames
 
 
 def shift_line_scan(s, shift, **kwargs):
@@ -93,7 +115,7 @@ def shift_line_scan(s, shift, **kwargs):
 
     Parameters
     ----------
-    s: Signal
+    s: ~hyperspy.signal.Signal
         s is a line scan Hyperspy signal
     shift: float
         amount by which to shift the line scan (in units of line scan,
@@ -105,7 +127,7 @@ def shift_line_scan(s, shift, **kwargs):
 
     Returns
     -------
-    s_shifted: Signal
+    s_shifted: hyperspy.signal.Signal
         shifted line scan
     """
     spectral_size = s.axes_manager[-1].size
@@ -125,6 +147,7 @@ def shift_line_scan(s, shift, **kwargs):
     return s_shifted
 
 
+# noinspection PyTypeChecker,PyUnboundLocalVariable
 def shift_lines(lines,
                 shifts,
                 show_progressbar=True,
@@ -134,21 +157,19 @@ def shift_lines(lines,
 
     Parameters
     ----------
-    lines: list of Signals
+    lines: list of :py:class:`~hyperspy.signal.Signal`
         list of Hyperspy line scans to shift
-    shifts: np.array
+    shifts: numpy.array
         array (of same length as lines) that specifies shift of each line (in
         the units of the line scan)
-    show_progressbar: boolean
+    show_progressbar: bool
         switch to determine whether a progressbar should be shown.
-        Requires python-progressbar fork from
-        https://github.com/fnoble/python-progressbar
     progress_label: str
         label to use for progressbar
 
     Returns
     -------
-    shifted_lines: list of Signals
+    shifted_lines: list of :py:class:`hyperspy.signal.Signal`
         duplicated list of lines, but shifted as desired
     """
     # if the length of lines and shifts do not match, raise an error
@@ -156,19 +177,13 @@ def shift_lines(lines,
         raise ValueError("Length of lines and shifts did not match.")
 
     if show_progressbar:
-        widgets = [progress_label, Percentage(), ' ', Bar(), ' ',
-                   ETA()]
-        progress = ProgressBar(widgets=widgets)
+        prg_lines = tqdm(lines, desc=progress_label)
+    else:
+        prg_lines = lines
 
     # list to hold the shifted line scans
     shifted_lines = []
-
     i = 0
-    try:
-        prg_lines = progress(lines)
-    except:
-        prg_lines = lines
-
     # run through the lines
     for l in prg_lines:
         # shift each line by shifts[i] and add it to the shifted_lines list
@@ -197,12 +212,14 @@ def shift_area_stem(stem_s,
 
     Parameters
     ----------
-    stem_s: HyperSpy signal with signal dimension > 1
-        Should be a HAADF STEM image loaded into hyperspy that will be shifted
+    stem_s: ~hyperspy.signal.Signal
+        A HAADF STEM image (with signal dimension > 1) loaded into
+        hyperspy that will be shifted
     stem_list: list
-        list of stem signals (as output by `get_shifts_from_area_stem`.
-        Providing this will save a little time extracting the scans again,
-        but is honestly not very necessary
+        list of stem signals (as output by
+        :py:meth:`get_shifts_from_area_stem`. Providing this will save a
+        little time extracting the scans again, but is honestly not very
+        necessary
     shifts: list or None
         list of shifts to use. If None, they will be determined automatically
     crop_scan: bool
@@ -213,12 +230,12 @@ def shift_area_stem(stem_s,
     do_smoothing: bool
         Whether to smooth the signal before finding shifts
     smoothing_parameter: float
-        parameter supplied to `determine_shifts` to define how much to
+        parameter supplied to :py:meth:`determine_shifts` to define how much to
         smooth the data while finding the shift values
 
     Returns
     -------
-    shifted_s: HyperSpy signal
+    shifted_s: hyperspy.signal.Signal
         shifted STEM signal
     """
     if shifts is None:
@@ -246,6 +263,7 @@ def shift_area_stem(stem_s,
     return shifted_s
 
 
+# noinspection PyTypeChecker
 def shift_area_eels(eels_s,
                     shifts,
                     crop_scan=True,
@@ -257,8 +275,9 @@ def shift_area_eels(eels_s,
 
     Parameters
     ----------
-    eels_s: HyperSpy signal with signal dimension > 1
-        Should be a HAADF STEM image loaded into hyperspy that will be shifted
+    eels_s: ~hyperspy.signal.Signal
+        A HAADF STEM image (with signal dimension > 1) loaded
+        into HyperSpy that will be shifted
     shifts: list
         list of shifts to use. Can be obtained from `get_shifts_from_area_stem`
     crop_scan: bool
@@ -269,7 +288,7 @@ def shift_area_eels(eels_s,
 
     Returns
     -------
-    shifted_s: HyperSpy signal
+    shifted_s: hyperspy.signal.Signal
         shifted EELS SI signal
     """
     lines = [eels_s.inav[:, i] for i in range(eels_s.data.shape[0])]
@@ -290,7 +309,6 @@ def shift_area_eels(eels_s,
     return shifted_s
 
 
-
 def get_shifts_from_area_stem(stem_s, **kwargs):
     """
     Get the shifts required from an area scan. Scan will be split into
@@ -298,17 +316,18 @@ def get_shifts_from_area_stem(stem_s, **kwargs):
 
     Parameters
     ----------
-    stem_s: HyperSpy signal with signal dimension > 1
-        Should be a HAADF STEM image loaded into hyperspy that will be used
-        to determine the needed shifts
+    stem_s: ~hyperspy.signal.Signal
+        A HAADF STEM image (with signal dimension > 1) loaded
+        into HyperSpy that will be used to determine the needed shifts
     **kwargs:
-        additional keyword arguments will be passed to `determine_shifts`
+        additional keyword arguments will be passed to
+        :py:meth:`determine_shifts`
 
     Returns
     -------
     stem_list: list
         List of stem line scans
-    shifts: np.array
+    shifts: numpy.array
         NumPy array of shift values in the x-direction (length of array is
         same as size of original signal in the y-direction)
     """
@@ -327,7 +346,7 @@ def smooth_scan(scan,
 
     Parameters
     ----------
-    scans: Hyperspy Signal
+    scan: ~hyperspy.signal.Signal
         scan is a Hyperspy signal that represent a STEM signal scan
     smoothing_parm: float
         amount to smooth (with Lowess filter) the scan before taking the
@@ -336,7 +355,7 @@ def smooth_scan(scan,
 
     Returns
     -------
-    smoothed_scan: Hyperspy Signal
+    smoothed_scan: hyperspy.signal.Signal
         Hyperspy signal that represent smoothed STEM signal scan
     """
     smoothed_scan = scan.deepcopy()
@@ -347,6 +366,7 @@ def smooth_scan(scan,
     return smoothed_scan
 
 
+# noinspection PyArgumentList
 def smooth_scans(scans,
                  smoothing_parm=0.05,
                  show_progressbar=True,
@@ -356,30 +376,29 @@ def smooth_scans(scans,
 
     Parameters
     ----------
-    scans: lsit of Hyperspy Signal
+    scans: list of :py:class:`~hyperspy.signal.Signal`
         scan is list of  Hyperspy signals that represent STEM signal scans
-    smoothing_parm: float or str
+    smoothing_parm: float
         amount to smooth (with Lowess filter) the scan before taking the
         derivative. The default of 0.05 seems to work well for typical STEM
         scans.
-        If 'ask', a dialog will be provide to the user to get the value
-    show_progressbar: boolean
+        If 'ask' is provided, a dialog will be provide to the user to get the
+        value
+    show_progressbar: bool
         switch to determine whether or not a progress bar should be shown
-        Requires python-progressbar fork from
-        https://github.com/fnoble/python-progressbar
     progress_label: str
         label to use for progressbar
 
     Returns
     -------
-    smoothed_scans: Hyperspy Signal
-        Hyperspy signal that represent smoothed STEM signal scan
+    smoothed_scans: hyperspy.signal.Signal
+        Hyperspy signal that represents smoothed STEM signal scan
     """
     smoothed_scans = [0] * len(scans)
 
     if smoothing_parm is 'ask':
         if QtGui.QApplication.instance() is None:
-            app = QtGui.QApplication(sys.argv)
+            _ = QtGui.QApplication(sys.argv)
 
         input_d = QtGui.QInputDialog(None,
                                      QtCore.Qt.WindowStaysOnTopHint)
@@ -398,16 +417,17 @@ def smooth_scans(scans,
             # app.exit()
             pass
         else:
-            print 'User cancelled input. Terminating.'
+            print('User cancelled input. Terminating.')
             sys.exit(1)
             # input_d.exit()
 
     if show_progressbar:
-        widgets = [progress_label, Percentage(), ' ', Bar(), ' ', ETA()]
-        progress = ProgressBar(widgets=widgets)
+        prg_scans = tqdm(scans, desc=progress_label)
+    else:
+        prg_scans = scans
 
     i = 0
-    for s in progress(scans):
+    for s in prg_scans:
         smoothed_scans[i] = smooth_scan(s, smoothing_parm)
         i += 1
 
@@ -420,13 +440,18 @@ def _interp_spectrum(stem_s, step_size, kind='cubic'):
 
     Parameters
     ----------
-    stem_s: HyperSpy spectrum
+    stem_s: ~hyperspy._signals.spectrum.Spectrum
         signal to interpolate
     step_size: float
         step size to use for interpolation
     kind: str
         kind of interpolation function to use (as defined in
-        `scipy.interpolate.interp1d`)
+        :py:class:`scipy.interpolate.interp1d`)
+
+    Returns
+    -------
+    int_s: hyperspy._signals.spectrum.Spectrum
+        Interpolated HyperSpy spectrum
     """
     # Create interpolation function
     f = interp1d(stem_s.axes_manager[0].axis, stem_s.data, kind=kind)
@@ -447,39 +472,40 @@ def _interp_spectrum(stem_s, step_size, kind='cubic'):
     return int_s
 
 
+# noinspection PyTypeChecker,PyUnresolvedReferences
 def determine_shifts(scans,
                      interp_step=0.001,
                      do_smoothing=False,
                      smoothing_parameter=0.05,
                      debug=False):
     """
-    determine the units needed to shift scans to the center of spectrum image
+    Determine the units needed to shift scans to the center of spectrum image
 
     Parameters
     ----------
-    scans: list of Signals
+    scans: list of :py:class:`~hyperspy.signal.Signal`
         scans is a list of Hyperspy signals that represent STEM signal scans
-         (that match up with a series of line scans)
+        (that match up with a series of line scans)
     interp_step: float
-        step size to use for interpolation in `_interp_spectrum`
-    do_smoothing: boolean
-        ** Deprecated in favor of the interpolation scheme used instead **
+        step size to use for interpolation in :py:meth:`_interp_spectrum`
+    do_smoothing: bool
+        `Deprecated in favor of the interpolation scheme used instead`
         whether or not smoothing will be done. Disabling is useful in case
         you have already smoothed the scans ahead of time.
-    smoothing_parameter: float or str
-        ** Deprecated in favor of the interpolation scheme used instead **
+    smoothing_parameter: float
+        `Deprecated in favor of the interpolation scheme used instead`
     amount to smooth (with Lowess filter) the scan before taking the
         derivative. The default of 0.05 seems to work well for typical STEM
         scans. If 'ask', a dialog box will be risen asking for the factor
-    debug: boolean
+    debug: bool
         switch whether debugging information is printed out to see the shift
         values and everything
 
     Returns
     -------
-    shifts: np.array
-        array of length len(scans) with the amount of shift (units of x-axis)
-        needed to bring the transition point to the mean middle point
+    shifts: numpy.array
+        array of length ``len(scans)`` with the amount of shift (units of
+        x-axis) needed to bring the transition point to the median middle point
     """
     mids = np.zeros(len(scans))
 
@@ -511,7 +537,7 @@ def determine_shifts(scans,
         #   # y-average of last N x-pixels
         #   last_data_i = interp.data[-n:].mean()
         interp2 = interp.deepcopy()
-        interp2.data.sort()             # sort data so we can get min/max
+        interp2.data.sort()  # sort data so we can get min/max
         low_10 = interp2.data[:0.1 * len(interp2.data)].mean()
         high_10 = interp2.data[0.9 * len(interp2.data):].mean()
 
@@ -522,7 +548,7 @@ def determine_shifts(scans,
         a = interp.axes_manager[0]
         min_x = a.index2value(low_idx)
         max_x = a.index2value(high_idx)
-        min_x, max_x = sorted([min_x, max_x])   # sort list so min is < max
+        min_x, max_x = sorted([min_x, max_x])  # sort list so min is < max
 
         # y-average of the high and low marks
         mid_y_data_i = np.array([low_10, high_10]).mean()
@@ -548,16 +574,26 @@ def determine_shifts(scans,
 
         if debug:
             # Print midpoint data and plot the data
-            print("({}, {})".format(midpoint, y_mp))
-            interp.plot()
-            plt.scatter(midpoint, y_mp)
+            print(("({}, {:.2f})".format(midpoint, y_mp)))
+            # interp.plot()
+            # plt.scatter(midpoint, y_mp)
 
-    shifts = mids - np.mean(mids)
+    shifts = mids - np.median(mids)
 
     if debug:
         # print "Mids are:"
         # pprint(list(mids))
-        print "Mean mids is %g" % np.mean(mids)
+        u = stem.axes_manager[0].units
+        med = np.median(mids)
+        plt.scatter(range(len(mids)), mids)
+        plt.axhline(med, ls='--', c='k')
+        plt.text(0.5, med + 0.05, 'Median = {0:.2f} {1:s}'.format(med, u))
+        ax = plt.gca()
+        ax.set_ylabel('Midpoint location ({:s})'.format(u))
+        ax.set_xlabel('Scan #')
+        plt.xlim(0, len(mids))
+        print(("Median mids is {:.2f}".format(np.median(mids))))
+        print(("Mean mids is {:.2f}".format(np.mean(mids))))
 
     # we need the negative of shifts for actual shifting
     return shifts * -1
@@ -572,28 +608,20 @@ def normalize_lines(lines,
 
     Parameters
     ----------
-    lines: list of Signals
+    lines: list of :py:class:`~hyperspy.signal.Signal`
         list of Hyperspy line scans to normalize
-    show_progressbar: boolean
+    show_progressbar: bool
         switch to determine whether a progressbar should be shown.
-        Requires python-progressbar fork from
-        https://github.com/fnoble/python-progressbar
     progress_label: str
         label to use for progressbar
     """
     if show_progressbar:
-        widgets = [progress_label, Percentage(), ' ', Bar(), ' ', ETA()]
-        progress = ProgressBar(widgets=widgets)
-
-    try:
-        prg_lines = progress(lines)
-    except:
+        prg_lines = tqdm(lines, desc=progress_label)
+    else:
         prg_lines = lines
 
-    maxes = lines[0].max(-1).data
     try:
         # if this command is valid, we had line scans with a nav dim.
-        shape = maxes.shape[0]
         line_scans = True
     except IndexError:
         # if we caught an IndexError, it means we had STEM scans that
@@ -614,16 +642,16 @@ def crop_area_scan(area_scan, shifts):
     """
     crop an area scan to remove areas of nan that are left from shifting lines
 
-    Parameters:
+    Parameters
     -----------
-    area_scan: hyperspy Signal
+    area_scan: ~hyperspy.signal.Signal
         area spectrum image that has been built by stacking lines
-    shifts: np.array
+    shifts: numpy.array
         array of shift values that were found with determine_shifts()
 
-    Returns:
-    --------
-    cropped_scan: hyperspy Signal
+    Returns
+    -------
+    cropped_scan: hyperspy.signal.Signal
         spatially cropped version of area_scan
     """
     # if there are more than two dimensions, we are looking at line scans
@@ -666,9 +694,9 @@ def get_scans_and_eels_fnames():
     to SiO2 direction and SiO2 to SiC direction. The method also sorts the
     lists in natural order so they are in an order that makes sense.
 
-    Returns:
-    --------
-    c_to_o_stem, c_to_o_eels, o_to_c_stem, o_to_c_eels: list
+    Returns
+    -------
+    c_to_o_stem, c_to_o_eels, o_to_c_stem, o_to_c_eels: list of str
         lists of file names for each selected files
     """
     c_to_o_stem = gui_fnames(title="Select SiC to SiO2 STEM scans...")
@@ -685,6 +713,7 @@ def get_scans_and_eels_fnames():
     return c_to_o_stem, c_to_o_eels, o_to_c_stem, o_to_c_eels
 
 
+# noinspection PyUnboundLocalVariable
 def load_shift_and_build_area(c_to_o_stem=None,
                               c_to_o_eels=None,
                               o_to_c_stem=None,
@@ -698,8 +727,6 @@ def load_shift_and_build_area(c_to_o_stem=None,
     Load a number of STEM signals and EELS line scans in order to
     build useful area scans out of them for decomposition and other analysis
 
-    Usage:
-    ------
     If no filenames are supplied, four file chooser dialogs will be opened.
     The files should be chosen in the order of SiC to SiO2 STEM, SiC to SiO2
     EELS, SiO2 to SiC STEM, and then SiO2 to SiC EELS.
@@ -710,62 +737,68 @@ def load_shift_and_build_area(c_to_o_stem=None,
 
     Note: all line scans must be same dimensions, or there will be an error.
 
-    Parameters:
+    Parameters
     -----------
-    c_to_o_stem, c_to_o_eels, o_to_c_stem, o_to_c_eels: lists of str
+    c_to_o_stem: list of str
         If supplied as keyword arguments, this method will not bring up a
         dialog in order to get the file names, and just use those that are
         in the lists instead. This can be useful when combined with
-        ``get_scans_and_eels_fnames()`` so the function can be run multiple
-        times without having to click through all the dialogs.
-    shifts: list of floats
+        :py:meth:`get_scans_and_eels_fnames` so the function can be run
+        multiple times without having to click through all the dialogs.
+    c_to_o_eels: list of str
+        See ``c_to_o_stem``
+    o_to_c_stem: list of str
+        See ``c_to_o_stem``
+    o_to_c_eels: list of str
+        See ``c_to_o_stem``
+    shifts: list of float
         list of shift amounts to use. Allows one to supply custom shifts for 
         each line, which will be applied to both the EELS and STEM scans
         If None, the method will try to figure it out itself
     smoothing_parameter: float or 'ask'
-        This is the parameter passed to ``determine_shifts()`` in order to
+        This is the parameter passed to :py:meth:`determine_shifts` in order to
         figure out how much to smooth the STEM signals before doing all the
         derivative work. Lower values are less smoothing, which will be
         more accurate, but be more susceptible to noise. Typical values are
         on the order of [0.03, 0.1], depending on the signal.
-    return_unshifted: boolean
+    return_unshifted: bool
         switch whether or not to return the unshifted data (good for
         comparison)
-    return_uncropped: boolean
+    return_uncropped: bool
         switch whether or not to return the uncropped data (good for
         comparison)
-    debug: boolean
+    debug: bool
         switch whether debugging information is printed out to see the shift
         values and everything
 
-    Returns:
-    --------
+    Returns
+    -------
     res: tuple
         the results tuple will have the following signals, in the following
         order:
-            area_stem: hs.signal
+            area_stem: :py:class:`~hyperspy.signal.Signal`
                 Hyperspy signal containing shifted and cropped STEM signals
                 as an image, rather than a list of profiles
-            area_eels: hs.signal
+            area_eels: :py:class:`~hyperspy.signal.Signal`
                 Hyperspy signal containing the shifted and cropped EELS
                 line scans as an area scan, rather than a list of single
                 line scans
             file_list: list
                 List of the files that were processed
-            area_stem_nocrop: hs.signal
+            area_stem_nocrop: :py:class:`~hyperspy.signal.Signal`
                 (Optional)
                 Hyperspy signal containing shifted but not cropped STEM
                 signals as an image, rather than a list of profiles
-            area_eels_nocrop: hs.signal
+            area_eels_nocrop: :py:class:`~hyperspy.signal.Signal`
                 (Optional)
                 Hyperspy signal containing the shifted but not cropped EELS
                 line scans as an area scan, rather than a list of single
                 line scans
-            area_stem_unshifted: hs.signal
+            area_stem_unshifted: :py:class:`~hyperspy.signal.Signal`
                 (Optional)
                 Hyperspy signal containing the unshifted STEM signals as an
                 image, rather than a list of profiles
-            area_eels_unshifted: hs.signal
+            area_eels_unshifted: :py:class:`~hyperspy.signal.Signal`
                 (Optional)
                 Hyperspy signal containing the unshifted EELS line scans
                 as an area scan, rather than a list of single line scans
@@ -809,66 +842,66 @@ def load_shift_and_build_area(c_to_o_stem=None,
 
     # Handle some errors related to scan sizes and magnifications
     if not _check_list_equal(scan_sizes):
-        print "STEM scans were not all same size."
-        print ""
-        print "SiC to SiO2 files were:"
+        print("STEM scans were not all same size.")
+        print("")
+        print("SiC to SiO2 files were:")
         for i in c_to_o_stem:
-            print i
-        print ""
-        print "SiO2 to SiC files were:"
+            print(i)
+        print("")
+        print("SiO2 to SiC files were:")
         for i in o_to_c_stem:
-            print i
+            print(i)
 
-        print ""
-        print "Sizes were:"
+        print("")
+        print("Sizes were:")
         pprint(scan_sizes)
         raise ValueError("All line scans must be same size for stacking.")
 
     if not _check_list_equal(scan_scales):
-        print "STEM scans were not all same scale (different mag?)."
-        print ""
-        print "SiC to SiO2 files were:"
+        print("STEM scans were not all same scale (different mag?).")
+        print("")
+        print("SiC to SiO2 files were:")
         for i in c_to_o_stem:
-            print i
-        print ""
-        print "SiO2 to SiC files were:"
+            print(i)
+        print("")
+        print("SiO2 to SiC files were:")
         for i in o_to_c_stem:
-            print i
+            print(i)
 
-        print ""
-        print "Scales were:"
+        print("")
+        print("Scales were:")
         pprint(scan_scales)
         raise ValueError("All line scans must be same scale for stacking.")
 
     if not _check_list_equal(line_sizes):
-        print "EELS line scans were not all same size."
-        print ""
-        print "SiC to SiO2 files were:"
+        print("EELS line scans were not all same size.")
+        print("")
+        print("SiC to SiO2 files were:")
         for i in c_to_o_eels:
-            print i
-        print ""
-        print "SiO2 to SiC files were:"
+            print(i)
+        print("")
+        print("SiO2 to SiC files were:")
         for i in o_to_c_eels:
-            print i
+            print(i)
 
-        print ""
-        print "Sizes were:"
+        print("")
+        print("Sizes were:")
         pprint(line_sizes)
         raise ValueError("All line scans must be same size for stacking.")
 
     if not _check_list_equal(line_scales):
-        print "EELS line scans were not all same scale (different mag?)."
-        print ""
-        print "SiC to SiO2 files were:"
+        print("EELS line scans were not all same scale (different mag?).")
+        print("")
+        print("SiC to SiO2 files were:")
         for i in c_to_o_stem:
-            print i
-        print ""
-        print "SiO2 to SiC files were:"
+            print(i)
+        print("")
+        print("SiO2 to SiC files were:")
         for i in o_to_c_stem:
-            print i
+            print(i)
 
-        print ""
-        print "Scales were:"
+        print("")
+        print("Scales were:")
         pprint(line_scales)
         raise ValueError("All line scans must be same scale for stacking.")
 
@@ -885,7 +918,7 @@ def load_shift_and_build_area(c_to_o_stem=None,
                                   debug=debug)
 
     if debug:
-        print "Shifts are:"
+        print("Shifts are:")
         pprint(list(shifts))
 
     # normalize the intensity of the line scans:
@@ -905,10 +938,10 @@ def load_shift_and_build_area(c_to_o_stem=None,
                                 progress_label='Shifting STEM signals:')
 
     # create area spectrum images from the lines
-    area_eels_nocrop = hs.utils.stack(shifted_lines)
+    area_eels_nocrop = hs.stack(shifted_lines)
     area_eels_nocrop.axes_manager[1].name = 'line scan'
     area_eels_nocrop.axes_manager[1].units = '#'
-    area_stem_nocrop = hs.utils.stack(shifted_scans)
+    area_stem_nocrop = hs.stack(shifted_scans)
     area_stem_nocrop.axes_manager[0].name = 'STEM profile'
     area_stem_nocrop.axes_manager[0].units = '#'
 
@@ -942,8 +975,8 @@ def load_shift_and_build_area(c_to_o_stem=None,
 
     # if we want to return the unshifted data, add it to the list
     if return_unshifted:
-        area_stem_unshifted = hs.utils.stack(scans)
-        area_eels_unshifted = hs.utils.stack(lines)
+        area_stem_unshifted = hs.stack(scans)
+        area_eels_unshifted = hs.stack(lines)
 
         # Set appropriate titles for the signals
         area_eels_unshifted.metadata.General.title = 'Stacked EELS line scans'

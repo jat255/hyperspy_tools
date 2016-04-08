@@ -1,7 +1,7 @@
 .idea/*
 *~
 *.pyc
-
+doc/_build
 hyperspy_tools.egg-info/dependency_links.txt
 hyperspy_tools.egg-info/PKG-INFO
 hyperspy_tools.egg-info/
