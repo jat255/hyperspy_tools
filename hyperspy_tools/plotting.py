@@ -19,14 +19,14 @@
 # of the spectrum image, beam location, and spatial drift box
 # #########################################################################
 
-import seaborn as sns
+import seaborn as _sns
 import matplotlib
-from matplotlib.patches import Rectangle
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.patches import Rectangle as _Rect
+from mpl_toolkits.axes_grid1 import make_axes_locatable as _mal
 import hyperspy
 
-import hyperspy.api as hs
-import hyperspy.io_plugins.digital_micrograph as dm
+import hyperspy.api as _hs
+import hyperspy.io_plugins.digital_micrograph as _dm
 
 
 __all__ = ['fit_peak',
@@ -74,8 +74,8 @@ def fit_peak(sig, lower_bound, upper_bound, factor_num=None,):
         m1 = c1.create_model(auto_background=False)
     else:
         m1 = c1.create_model()
-    g1 = hs.model.components.Gaussian(centre=((float(lower_bound) +
-                                               upper_bound) / 2.0))
+    g1 = _hs.model.components.Gaussian(centre=((float(lower_bound) +
+                                                upper_bound) / 2.0))
     m1.append(g1)
     m1.set_signal_range(lower_bound, upper_bound)
     m1.fit()
@@ -89,7 +89,7 @@ def fit_peak(sig, lower_bound, upper_bound, factor_num=None,):
 def add_colored_outlines(fig,
                          signal,
                          num_images,
-                         color_palette=sns.color_palette(),
+                         color_palette=_sns.color_palette(),
                          border=0.0,
                          lw=15):
     """
@@ -117,13 +117,13 @@ def add_colored_outlines(fig,
     for i in range(num_images):
         ax = fig.get_axes()[num_images - (1 + i)]
         # noinspection PyUnresolvedReferences
-        r = Rectangle((border, border),
-                      x - 1.5 * border,
-                      y - 1.5 * border,
-                      fill=False,
-                      edgecolor=color_palette[num_images - (1 + i)],
-                      alpha=1,
-                      linewidth=lw)
+        r = _Rect((border, border),
+                  x - 1.5 * border,
+                  y - 1.5 * border,
+                  fill=False,
+                  edgecolor=color_palette[num_images - (1 + i)],
+                  alpha=1,
+                  linewidth=lw)
         ax.add_patch(r)
 
 
@@ -148,7 +148,7 @@ def add_custom_colorbars(fig,
     for i, a in enumerate(fig.axes):
         # if i == 2:
         #     a.get_images()[0].set_clim(0,16)
-        div = make_axes_locatable(a)
+        div = _mal(a)
         cax = div.append_axes("right", size="5%", pad=0.05)
         if tick_list is None:
             _ = fig.colorbar(a.get_images()[0], cax=cax)
@@ -209,18 +209,18 @@ def plot_dm3_survey_with_markers(fname,
 
     def _add_beam(image, location):
         if plot_beam:
-            beam_m = hs.plot.markers.point(x=location[1],
-                                           y=location[0],
-                                           color='red')
+            beam_m = _hs.plot.markers.point(x=location[1],
+                                            y=location[0],
+                                            color='red')
             image.add_marker(beam_m)
             if add_text:
-                beam_text_m = hs.plot.markers.text(x=location[1] - (0.5 *
-                                                                    x_offset),
-                                                   y=location[0] - (1.5 *
+                beam_text_m = _hs.plot.markers.text(x=location[1] - (0.5 *
+                                                                     x_offset),
+                                                    y=location[0] - (1.5 *
                                                                     y_offset),
-                                                   color='red',
-                                                   text='Beam',
-                                                   size=text_size)
+                                                    color='red',
+                                                    text='Beam',
+                                                    size=text_size)
                 image.add_marker(beam_text_m)
         else:
             pass
@@ -229,44 +229,44 @@ def plot_dm3_survey_with_markers(fname,
         # adds a green rectangle (or line, if the coordinates are such) to
         # image
         if plot_si:
-            si_m = hs.plot.markers.rectangle(x1=location[1],
-                                             y1=location[0],
-                                             x2=location[3],
-                                             y2=location[2],
-                                             color='#13FF00')
+            si_m = _hs.plot.markers.rectangle(x1=location[1],
+                                              y1=location[0],
+                                              x2=location[3],
+                                              y2=location[2],
+                                              color='#13FF00')
             image.add_marker(si_m)
             if add_text:
-                si_text_m = hs.plot.markers.text(x=location[1],
-                                                 y=location[0] - (0.5 *
+                si_text_m = _hs.plot.markers.text(x=location[1],
+                                                  y=location[0] - (0.5 *
                                                                   y_offset),
-                                                 color='#13FF00',
-                                                 text='Spectrum Image',
-                                                 size=text_size)
+                                                  color='#13FF00',
+                                                  text='Spectrum Image',
+                                                  size=text_size)
                 image.add_marker(si_text_m)
         else:
             pass
 
     def _add_drift(image, location):
         if plot_drift:
-            drift_m = hs.plot.markers.rectangle(x1=location[1],
-                                                y1=location[0],
-                                                x2=location[3],
-                                                y2=location[2],
-                                                color='yellow')
+            drift_m = _hs.plot.markers.rectangle(x1=location[1],
+                                                 y1=location[0],
+                                                 x2=location[3],
+                                                 y2=location[2],
+                                                 color='yellow')
             image.add_marker(drift_m)
             if add_text:
-                drift_text_m = hs.plot.markers.text(x=location[1],
-                                                    y=location[0] - (0.5 *
+                drift_text_m = _hs.plot.markers.text(x=location[1],
+                                                     y=location[0] - (0.5 *
                                                                      y_offset),
-                                                    color='yellow',
-                                                    text='Spatial Drift',
-                                                    size=text_size)
+                                                     color='yellow',
+                                                     text='Spatial Drift',
+                                                     size=text_size)
                 image.add_marker(drift_text_m)
         else:
             pass
 
-    im = hs.load(fname)
-    flist = dm.file_reader(fname)
+    im = _hs.load(fname)
+    flist = _dm.file_reader(fname)
     annotation_list = flist[0]['original_metadata']['DocumentObjectList'][
                                'TagGroup0']['AnnotationGroupList']
 

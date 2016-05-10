@@ -36,6 +36,14 @@ Line Scan Shifting
     ~hyperspy_tools.shifting_lines._natural_sort
     ~hyperspy_tools.shifting_lines.gui_fnames
 
+EELS Methods
+++++++++++++
+
+..  autosummary::
+
+    ~hyperspy_tools.eels.extract_ZLP
+    ~hyperspy_tools.eels.align_energy_vertical
+
 Plotting API
 ============
 
@@ -50,6 +58,16 @@ Line Scan Shifting API
 ======================
 
 ..  automodule:: hyperspy_tools.shifting_lines
+    :members:
+    :private-members:
+    :undoc-members:
+    :show-inheritance:
+
+
+EELS API
+========
+
+..  automodule:: hyperspy_tools.eels
     :members:
     :private-members:
     :undoc-members:
