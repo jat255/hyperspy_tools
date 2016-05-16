@@ -23,6 +23,7 @@ import hyperspy.api as _hs
 import numpy as _np
 from tqdm import tqdm as _tqdm
 import math as _math
+import matplotlib.pyplot as _plt
 
 __all__ = ['extract_ZLP',
            'align_energy_vertical']
@@ -183,7 +184,8 @@ def align_energy_vertical(signal,
                           smoothing_parameter=0.05,
                           number_of_iterations=1,
                           print_output=True,
-                          plot_deriv=False):
+                          plot_deriv=False,
+                          plot_shifts=False):
     """
     Align the energy (signal) axis of a spectrum image, based off of the
     spectrum in the first column of each row. This is useful for SI of
@@ -223,16 +225,18 @@ def align_energy_vertical(signal,
     smoothing_parameter: float
         Degree of smoothing used to smooth the original spectral data
         (necessary before taking the derivative). This parameter is passed to
-        ~hyperspy.signal.Signal1DTools.smooth_lowess
+        :py:meth:`~hyperspy.signal.Signal1DTools.smooth_lowess`
     number_of_iterations: int
         Number of Lowess iterations used to smooth the original spectral data
         (necessary before taking the derivative). This parameter is passed to
-        ~hyperspy.signal.Signal1DTools.smooth_lowess
+        :py:meth:`~hyperspy.signal.Signal1DTools.smooth_lowess`
     print_output: bool
         Whether or not to show output during calculation.
     plot_deriv: bool
         Whether or not to plot the derivative output. Useful if results are
         not as expected, and can show if more smoothing is needed
+    plot_shifts: bool
+        Whether or not to show a plot illustrating the shifts that were found
 
     Returns
     -------
@@ -240,8 +244,11 @@ def align_energy_vertical(signal,
         2D spectrum image with signal axes aligned and cropped
     """
     s = signal.inav[column, :]
+    if print_output:
+        print("Smoothing column {}...".format(column))
     s.smooth_lowess(smoothing_parameter=smoothing_parameter,
-                    number_of_iterations=number_of_iterations)
+                    number_of_iterations=number_of_iterations,
+                    show_progressbar=False)
     sd = s.diff(-1)
     if plot_deriv:
         sd.plot()
@@ -253,13 +260,32 @@ def align_energy_vertical(signal,
         print(shifts)
         print('Max shift: {}'.format(_np.nanmax(shifts)))
 
+    if plot_deriv:
+        sdd = sd.deepcopy()
+        sdd.shift1D(shifts, crop=False, show_progressbar=False)
+        sdd.plot()
+
+    if plot_shifts:
+        u = s.axes_manager[-1].units
+        med = _np.median(shifts)
+        _plt.figure()
+        _plt.scatter(range(len(shifts)), shifts)
+        _plt.axhline(med, ls='--', c='k')
+        _plt.text(0.5, med + 0.05, 'Median = {0:.2f} {1:s}'.format(med, u))
+        ax = _plt.gca()
+        ax.set_ylabel('Shift value({:s})'.format(u))
+        ax.set_xlabel('Row #')
+        _plt.xlim(0, len(shifts))
+        print(("Median shift is {:.2f}".format(_np.median(shifts))))
+        print(("Mean shift is {:.2f}".format(_np.mean(shifts))))
+
     aligned_signal = signal.deepcopy()
 
     for i in _tqdm(range(signal.axes_manager['x'].size), desc='Aligning '
                                                               'spectrum '
                                                               'image'):
         s = signal.inav[i, :]
-        s.shift1D(shifts, crop=False)
+        s.shift1D(shifts, crop=False, show_progressbar=False)
         aligned_signal.inav[i, :] = s
 
     # ## This code lifted from HyperSpy's shift1D method:
@@ -275,8 +301,9 @@ def align_energy_vertical(signal,
     if maximum > 0:
         ilow = axis.value2index(axis.offset + maximum,
                                 rounding=_math.ceil)
-    offset = axis.offset
-    original_axis = axis.axis.copy()
+    else:
+        ilow = axis.low_index
+
     aligned_signal.crop(axis.index_in_axes_manager,
                         ilow,
                         ihigh)
