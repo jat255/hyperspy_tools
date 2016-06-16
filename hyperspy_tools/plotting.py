@@ -294,3 +294,73 @@ def plot_dm3_survey_with_markers(fname,
 
     return im   # Returns a hyperspy._signals.image.Image, and with it all
     #           editing and saving capabilities.
+
+
+def plot_decomposition_results(signal,
+                               list_of_comps,
+                               labels=None,
+                               factor_style='cascade',
+                               loadings_cmap='cubehelix',
+                               mva_type='decomposition',
+                               loadings_kwargs={},
+                               factors_kwargs={}):
+    """
+    Plot the results of a area SI decomposition (components and factors)
+
+    Parameters
+    ----------
+    signal: ~hyperspy.signal.Signal
+        2D signal for which to plot decomposition results
+    list_of_comps: list
+        should be a list of ints that defines which factors to plot. Can also
+        have a tuple (or another iterable) in place of an int, in which case
+        the prescribed components will be summed in the output
+    labels: list
+        list of labels to use for components
+    factor_style: string
+        string defining which plot_spectra style to use
+    loadings_cmap: string
+        colormap to use for the loadings plots
+    mva_type: string
+        'decomposition' or 'bss'. Defines which HyperSpy method to use
+    loadings_kwargs: dict
+        other keyword arguments passed to plot_images for the loadings plot
+    factors_kwargs: dict
+        other keyword arguments passed to plot_spectra for the factors plot
+    """
+
+    if mva_type == 'decomposition':
+        l = signal.get_decomposition_loadings()
+        f = signal.get_decomposition_factors()
+    elif mva_type == 'bss':
+        l = signal.get_bss_loadings()
+        f = signal.get_bss_factors()
+    else:
+        raise ValueError('Did not understand mva_type: {}'.format(mva_type))
+
+    l_to_plot = []
+    f_to_plot = []
+    for i in list_of_comps:
+        try:
+            l_x = [l.inav[j] for j in iter(i)]
+            f_x = [f.inav[j] for j in iter(i)]
+            summed_comp = l_x[0]
+            summed_fact = f_x[0]
+            for j in range(1, len(l_x)):
+                summed_comp += l_x[j]
+                summed_fact += f_x[j]
+            l_to_plot.append(summed_comp)
+            f_to_plot.append(summed_fact)
+        except:
+            l_to_plot.append(l.inav[i])
+            f_to_plot.append(f.inav[i])
+
+    _hs.plot.plot_images(l_to_plot,
+                         cmap=loadings_cmap,
+                         label=labels,
+                         **loadings_kwargs)
+
+    _hs.plot.plot_spectra(f_to_plot,
+                          style=factor_style,
+                          legend=labels,
+                          **factors_kwargs)
