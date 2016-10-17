@@ -13,8 +13,18 @@
 .. You should have received a copy of the GNU General Public License
 .. along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-hyperspy_tools
+HyperSpy Tools
 ==============
+
+**Help!**   |rtfd| |gitter|
+
+..  |rtfd| image:: https://readthedocs.org/projects/hyperspy-tools/badge/?version=latest
+    :target: http://hyperspy-tools.readthedocs.org/en/latest/?badge=latest
+    :alt: Documentation Status
+
+..  |gitter| image:: https://img.shields.io/gitter/room/nwjs/nw.js.svg
+    :alt: Join the chat at https://gitter.im/hyperspy/hyperspy
+    :target: https://gitter.im/hyperspy/hyperspy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
 
 This package supplies a reference point for useful scripts that have been
 developed for use with HyperSpy, a hyperspectral data analysis package.
