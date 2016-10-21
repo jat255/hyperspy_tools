@@ -207,7 +207,7 @@ def plot_dm3_survey_with_markers(fname,
         ``im._plot.signal_plot.figure.savefig()``
     """
 
-    def _add_beam(image, location):
+    def _add_beam(image, location, annotationtype):
         if plot_beam:
             beam_m = _hs.plot.markers.point(x=location[1],
                                             y=location[0],
@@ -225,28 +225,37 @@ def plot_dm3_survey_with_markers(fname,
         else:
             pass
 
-    def _add_si(image, location):
+    def _add_si(image, location, annotationtype):
         # adds a green rectangle (or line, if the coordinates are such) to
         # image
         if plot_si:
-            si_m = _hs.plot.markers.rectangle(x1=location[1],
-                                              y1=location[0],
-                                              x2=location[3],
-                                              y2=location[2],
-                                              color='#13FF00')
+            if annotationtype == 23: # Map
+                si_m = hs.plot.markers.rectangle(x1=location[1],
+                                                 y1=location[0],
+                                                 x2=location[3],
+                                                 y2=location[2],
+                                                 color='#13FF00')
+            elif annotationtype == 25: # Line profile
+                si_m = hs.plot.markers.line_segment(x1=location[1],
+                                                    y1=location[0],
+                                                    x2=location[3],
+                                                    y2=location[2],
+                                                    color='#13FF00')
+            else:
+                raise Exception("No spectrum image annotation found")
             image.add_marker(si_m)
             if add_text:
                 si_text_m = _hs.plot.markers.text(x=location[1],
-                                                  y=location[0] - (0.5 *
+                                                 y=location[0] - (0.5 *
                                                                   y_offset),
-                                                  color='#13FF00',
-                                                  text='Spectrum Image',
-                                                  size=text_size)
+                                                 color='#13FF00',
+                                                 text='Spectrum Image',
+                                                 size=text_size)
                 image.add_marker(si_text_m)
         else:
             pass
 
-    def _add_drift(image, location):
+    def _add_drift(image, location, annotationtype):
         if plot_drift:
             drift_m = _hs.plot.markers.rectangle(x1=location[1],
                                                  y1=location[0],
@@ -287,7 +296,8 @@ def plot_dm3_survey_with_markers(fname,
             label = annotation_list['TagGroup' + str(i)]['Label']
             loc = annotation_list['TagGroup' + str(i)]['Rectangle']
             scaled_loc = [scale * i for i in loc]
-            mapping[label](im, scaled_loc)
+            annotationtype = annotation_list['TagGroup' + str(i)]['AnnotationType']
+            mapping[label](im, scaled_loc, annotationtype)
 
         except KeyError:
             pass
