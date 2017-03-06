@@ -230,13 +230,13 @@ def plot_dm3_survey_with_markers(fname,
         # image
         if plot_si:
             if annotationtype == 23: # Map
-                si_m = hs.plot.markers.rectangle(x1=location[1],
+                si_m = _hs.plot.markers.rectangle(x1=location[1],
                                                  y1=location[0],
                                                  x2=location[3],
                                                  y2=location[2],
                                                  color='#13FF00')
             elif annotationtype == 25: # Line profile
-                si_m = hs.plot.markers.line_segment(x1=location[1],
+                si_m = _hs.plot.markers.line_segment(x1=location[1],
                                                     y1=location[0],
                                                     x2=location[3],
                                                     y2=location[2],
