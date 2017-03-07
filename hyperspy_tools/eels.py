@@ -87,7 +87,7 @@ def extract_ZLP(signal,
     def sigtohwhm(sig):
         return 2 * _np.sqrt(2 * _np.log(2)) * sig / 2
     m1 = signal.create_model()  # create model of signal
-    G = _hs.model.components.Gaussian()  # create gaussian component
+    G = _hs.model.components1D.Gaussian()  # create gaussian component
     # add gaussian component to model
     m1.append(G)
     # deactivate the power law background
@@ -118,8 +118,8 @@ def extract_ZLP(signal,
     # perform actual ZLP fitting
     # create model and add components
     m2 = signal.create_model()
-    g1 = _hs.model.components.Gaussian()
-    l1 = _hs.model.components.Lorentzian()
+    g1 = _hs.model.components1D.Gaussian()
+    l1 = _hs.model.components1D.Lorentzian()
     m2.extend((g1, l1))
     m2['PowerLaw'].active = False
     g1.centre.map['values'][:] = G_centre.data
@@ -248,7 +248,7 @@ def align_energy_vertical(signal,
         print("Smoothing column {}...".format(column))
     s.smooth_lowess(smoothing_parameter=smoothing_parameter,
                     number_of_iterations=number_of_iterations,
-                    show_progressbar=False)
+                    show_progressbar=True)
     sd = s.diff(-1)
     if plot_deriv:
         sd.plot()

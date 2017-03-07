@@ -26,6 +26,7 @@ import re
 from pprint import pprint
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+import logging
 
 import hyperspy.api as hs
 from PyQt4 import QtGui, QtCore
@@ -130,19 +131,28 @@ def shift_line_scan(s, shift, **kwargs):
     s_shifted: hyperspy.signal.Signal
         shifted line scan
     """
+    # get original logging level and set to "ERROR" to ignore warnings
+    # during this operation
+    l = logging.getLogger("hyperspy.signal")
+    level = l.getEffectiveLevel()
+    l.setLevel(40)
+
     spectral_size = s.axes_manager[-1].size
 
     # create array for shift1D function
     shift_array = np.array(shift).repeat(spectral_size)
 
     # transpose line scan so navigation axis is signal axis
-    s_transposed = s.as_spectrum(0)
+    s_transposed = s.as_signal1D(0)
     # shift by the amount in the shift_array
     s_transposed.shift1D(shift_array, **kwargs)
     # transpose back to original axes orientation
-    s_shifted = s_transposed.as_spectrum(0)
+    s_shifted = s_transposed.as_signal1D(0)
     # change the title to indicate shift
     s_shifted.metadata.General.title += ' - shifted'
+
+    # return logger to original level
+    l.setLevel(level)
 
     return s_shifted
 
@@ -461,7 +471,7 @@ def _interp_spectrum(stem_s, step_size, kind='cubic'):
     int_range = np.arange(ax_m.axis[0], ax_m.axis[-1], step=step_size)
 
     # Create and fix calibration of interpolated signal
-    int_s = hs.signals.Spectrum(f(int_range))
+    int_s = hs.signals.Signal1D(f(int_range))
     int_s.axes_manager[0].offset = stem_s.axes_manager[0].offset
     int_s.axes_manager[0].scale = step_size
     int_s.axes_manager[0].units = stem_s.axes_manager[0].units
@@ -538,8 +548,8 @@ def determine_shifts(scans,
         #   last_data_i = interp.data[-n:].mean()
         interp2 = interp.deepcopy()
         interp2.data.sort()  # sort data so we can get min/max
-        low_10 = interp2.data[:0.1 * len(interp2.data)].mean()
-        high_10 = interp2.data[0.9 * len(interp2.data):].mean()
+        low_10 = interp2.data[:int(0.1 * len(interp2.data))].mean()
+        high_10 = interp2.data[int(0.9 * len(interp2.data)):].mean()
 
         # Find index location in profile of global min/max,
         # as well as the axes value of this position
