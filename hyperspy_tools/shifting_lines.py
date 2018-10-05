@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import logging
 
 import hyperspy.api as hs
-from PyQt4 import QtGui, QtCore
+from PyQt5 import QtGui, QtCore
 from tqdm import tqdm
 
 __all__ = ['get_shifts_from_area_stem',
